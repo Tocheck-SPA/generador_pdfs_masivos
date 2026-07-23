@@ -22,13 +22,22 @@ class Settings(BaseSettings):
     database_url: str = Field(default="", alias="DATABASE_URL")
 
     # Fuente (ToCheck, solo lectura)
-    source_adapter: str = Field(default="fixture", alias="SOURCE_ADAPTER")  # fixture | postgres
+    source_adapter: str = Field(default="fixture", alias="SOURCE_ADAPTER")  # fixture | mysql | postgres
     source_database_url: str = Field(default="", alias="SOURCE_DATABASE_URL")
     source_database_sslmode: str = Field(default="require", alias="SOURCE_DATABASE_SSLMODE")
+    source_database_use_ssl: bool = Field(default=False, alias="SOURCE_DATABASE_USE_SSL")
     source_database_statement_timeout_seconds: int = Field(
         default=60, alias="SOURCE_DATABASE_STATEMENT_TIMEOUT_SECONDS"
     )
     source_query_batch_size: int = Field(default=100, alias="SOURCE_QUERY_BATCH_SIZE")
+    # Base fuente en AWS RDS MySQL (misma convención que otros proyectos ToCheck).
+    rds_host: str = Field(default="", alias="RDS_HOST")
+    rds_port: int = Field(default=3306, alias="RDS_PORT")
+    rds_user: str = Field(default="", alias="RDS_USER")
+    rds_pass: str = Field(default="", alias="RDS_PASS")
+    rds_db: str = Field(default="", alias="RDS_DB")
+    # Base de imágenes de la fuente (para resolver rutas relativas). Punto de extensión.
+    source_asset_base_url: str = Field(default="", alias="SOURCE_ASSET_BASE_URL")
     fixtures_dir: str = Field(default=str(_REPO_ROOT / "fixtures"), alias="FIXTURES_DIR")
 
     # Worker

@@ -23,6 +23,23 @@ def health_report(settings: Settings) -> str:
         except Exception:  # noqa: BLE001
             database = "error"
 
+    if settings.source_adapter == "mysql" and settings.rds_host:
+        try:
+            import pymysql
+
+            ssl = {"ssl": {}} if settings.source_database_use_ssl else None
+            conn = pymysql.connect(
+                host=settings.rds_host, port=settings.rds_port, user=settings.rds_user,
+                password=settings.rds_pass, database=settings.rds_db, connect_timeout=5, ssl=ssl,
+            )
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+                cur.fetchone()
+            conn.close()
+            source = "ok"
+        except Exception:  # noqa: BLE001
+            source = "error"
+
     if settings.source_adapter == "postgres" and settings.source_database_url:
         try:
             import psycopg

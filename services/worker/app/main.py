@@ -78,6 +78,36 @@ def _demo(company_id: int, form_id: int, date_from: str, date_to_exclusive: str)
     return 0 if outcome.status != "failed" else 2
 
 
+def _catalog(company_id: int | None, form_id: int | None, date_from: str, date_to_exclusive: str) -> int:
+    """Descubre empresas / formularios / puntos contra la fuente configurada."""
+    settings = get_settings()
+    repo = build_source_repository(settings)
+    if company_id is None:
+        print("Empresas con respuestas:")
+        for c in repo.list_companies():
+            print(f"  {c.id:>8}  {c.name}")
+        print("\nUsa --company-id <ID> para ver sus formularios.")
+        return 0
+    if form_id is None:
+        print(f"Formularios de la empresa {company_id}:")
+        for f in repo.list_forms(company_id):
+            print(f"  {f.id:>8}  {f.name}  [{f.code or '-'}]")
+        print("\nUsa --form-id <ID> (con --date-from/--date-to-exclusive) para ver puntos y conteo.")
+        return 0
+    filters = ReportFilters(
+        company_id=company_id, form_id=form_id,
+        date_from=datetime.fromisoformat(date_from),
+        date_to_exclusive=datetime.fromisoformat(date_to_exclusive),
+        evaluation_point_ids=[], include_all_points=True,
+    )
+    count = repo.count_responses(filters)
+    print(f"Se encontraron {count.total_responses} respuestas en {count.total_evaluation_points} puntos de evaluación.")
+    print("Puntos de evaluación:")
+    for p in repo.list_evaluation_points(filters):
+        print(f"  {p.id:>8}  {p.name}  ({p.zone or '-'})")
+    return 0
+
+
 def _run() -> int:
     from .jobs.runner import run_worker_loop
 
@@ -114,12 +144,20 @@ def main(argv: list[str] | None = None) -> int:
     demo.add_argument("--date-from", default="2026-07-01T00:00:00")
     demo.add_argument("--date-to-exclusive", default="2026-08-01T00:00:00")
 
+    cat = sub.add_parser("catalog", help="Lista empresas/formularios/puntos de la fuente")
+    cat.add_argument("--company-id", type=int, default=None)
+    cat.add_argument("--form-id", type=int, default=None)
+    cat.add_argument("--date-from", default="2026-01-01T00:00:00")
+    cat.add_argument("--date-to-exclusive", default="2027-01-01T00:00:00")
+
     sub.add_parser("run", help="Loop de worker sobre Neon")
     sub.add_parser("health", help="Estado de dependencias")
 
     args = parser.parse_args(argv)
     if args.command == "demo":
         return _demo(args.company_id, args.form_id, args.date_from, args.date_to_exclusive)
+    if args.command == "catalog":
+        return _catalog(args.company_id, args.form_id, args.date_from, args.date_to_exclusive)
     if args.command == "run":
         return _run()
     if args.command == "health":

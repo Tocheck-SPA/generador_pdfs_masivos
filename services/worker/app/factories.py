@@ -11,6 +11,10 @@ from .storage.local_storage import LocalStorage
 
 
 def build_source_repository(settings: Settings) -> SourceRepository:
+    if settings.source_adapter == "mysql":
+        from .source.mysql_repository import MySQLSourceRepository
+
+        return MySQLSourceRepository(settings)
     if settings.source_adapter == "postgres":
         from .source.postgres_repository import PostgresSourceRepository
 

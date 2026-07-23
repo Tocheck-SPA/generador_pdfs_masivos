@@ -95,6 +95,38 @@ DATABASE_URL=postgres://tocheck:tocheck@localhost:5432/tocheck_reportes \
 # La web con DATABASE_URL usa Postgres (pgStore) en vez del simulador.
 ```
 
+### 4. Conectar la fuente real (AWS RDS MySQL)
+
+La base de ToCheck es **MySQL en AWS RDS**. El worker trae datos con `SOURCE_ADAPTER=mysql`
+y la convención `RDS_*` (misma que otros proyectos ToCheck). En `services/worker/.env`:
+
+```
+SOURCE_ADAPTER=mysql
+RDS_HOST=...rds.amazonaws.com
+RDS_PORT=3306
+RDS_USER=readonly_user
+RDS_PASS=...
+RDS_DB=tocheck_prod
+SOURCE_DATABASE_USE_SSL=false
+STORAGE_BACKEND=local
+EMAIL_BACKEND=console
+```
+
+Descubre IDs y genera informes reales sin Neon/R2/Resend:
+
+```bash
+python -m app.main health                       # verifica la conexión
+python -m app.main catalog                       # empresas
+python -m app.main catalog --company-id 254      # formularios
+python -m app.main catalog --company-id 254 --form-id 100 \
+    --date-from 2026-07-01T00:00:00 --date-to-exclusive 2026-08-01T00:00:00  # puntos + conteo
+python -m app.main demo --company-id 254 --form-id 100 \
+    --date-from 2026-07-01T00:00:00 --date-to-exclusive 2026-08-01T00:00:00  # PDFs+ZIP a output/
+```
+
+El adaptador reutiliza las 12 consultas `.sql` traduciendo el dialecto (`= ANY(...)` → `IN ...`).
+Neon (base operativa) y el store de la web siguen siendo PostgreSQL.
+
 ## Pruebas
 
 ```bash
