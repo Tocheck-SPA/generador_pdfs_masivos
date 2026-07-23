@@ -1,0 +1,4 @@
+[
+  { "id": 100, "companyId": 254, "name": "Inspección Preventiva", "code": "PREV-01", "scale": "0-100", "logo": null, "welcomeMessage": "Bienvenido a la inspección preventiva." },
+  { "id": 101, "companyId": 254, "name": "Auditoría de Flota", "code": "FLOTA-02", "scale": "0-100", "logo": null, "welcomeMessage": null }
+]

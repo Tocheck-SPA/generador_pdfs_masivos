@@ -1,0 +1,44 @@
+# ============================================================
+# ToCheck Reportes — desarrollo local
+# Levanta: Postgres (base operativa "Neon" local) + worker Python.
+# La web se ejecuta con `npm run dev` en apps/web (más ágil para HMR).
+# ============================================================
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tocheck
+      POSTGRES_PASSWORD: tocheck
+      POSTGRES_DB: tocheck_reportes
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tocheck -d tocheck_reportes"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    build:
+      context: ./services/worker
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://tocheck:tocheck@db:5432/tocheck_reportes
+      SOURCE_ADAPTER: fixture
+      STORAGE_BACKEND: local
+      EMAIL_BACKEND: console
+      WORKER_ID: worker-docker-1
+      FIXTURES_DIR: /fixtures
+    volumes:
+      - worker_output:/app/output
+      - ./fixtures:/fixtures:ro
+
+volumes:
+  db_data:
+  worker_output:

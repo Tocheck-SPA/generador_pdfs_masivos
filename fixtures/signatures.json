@@ -1,0 +1,4 @@
+[
+  { "responseId": 128483, "signerUserId": 51, "signerName": "Pedro", "signerLastName": "Soto", "status": "firmado", "sentAt": "2026-07-05T11:00:00", "signedAt": "2026-07-05T11:05:00", "observation": "Conforme con los hallazgos." },
+  { "responseId": 128484, "signerUserId": 50, "signerName": "María", "signerLastName": "González", "status": "pendiente", "sentAt": "2026-07-10T14:30:00", "signedAt": null, "observation": null }
+]

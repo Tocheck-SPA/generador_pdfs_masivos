@@ -1,0 +1,4 @@
+[
+  { "responseId": 128483, "additionalQuestionId": 300, "question": "¿Requiere visita de seguimiento?", "questionText": "Marque si se necesita una nueva visita.", "answerBoolean": true },
+  { "responseId": 128483, "additionalQuestionId": 301, "question": "¿Cliente presente durante la inspección?", "questionText": "Confirmación de presencia del responsable del local.", "answerBoolean": false }
+]

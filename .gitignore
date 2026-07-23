@@ -1,0 +1,29 @@
+# Node
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Env
+.env
+.env.local
+.env*.local
+
+# Build artifacts / runtime output
+services/worker/output/
+/tmp/tocheck-reports/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

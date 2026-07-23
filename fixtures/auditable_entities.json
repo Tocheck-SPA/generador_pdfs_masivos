@@ -1,0 +1,4 @@
+[
+  { "id": 700, "name": "Camión Reparto ABCD-12", "identifierCode": "ABCD-12", "email": null, "type": "Vehículo" },
+  { "id": 701, "name": "Extintor Bodega E-45", "identifierCode": "E-45", "email": "mantencion@tarragona.cl", "type": "Equipo" }
+]

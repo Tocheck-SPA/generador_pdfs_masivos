@@ -1,0 +1,30 @@
+[
+  {
+    "responseId": 128483, "companyId": 254, "formId": 100, "evaluationPointId": 900,
+    "auditableEntityId": null, "userId": 50,
+    "completedAt": "2026-07-05T10:30:00", "startedAt": "2026-07-05T10:00:00",
+    "score": 87.5, "generalObservation": "Local en buen estado general. Se detecta un punto crítico de señalética.",
+    "coordinates": "-33.4262,-70.6156", "timing": "1800"
+  },
+  {
+    "responseId": 128484, "companyId": 254, "formId": 101, "evaluationPointId": null,
+    "auditableEntityId": 700, "userId": 51,
+    "completedAt": "2026-07-10T14:00:00", "startedAt": "2026-07-10T13:40:00",
+    "score": 92.0, "generalObservation": null,
+    "coordinates": null, "timing": "1200"
+  },
+  {
+    "responseId": 128485, "companyId": 254, "formId": 100, "evaluationPointId": 901,
+    "auditableEntityId": 701, "userId": 50,
+    "completedAt": "2026-07-12T09:15:00", "startedAt": "2026-07-12T08:50:00",
+    "score": 64.0, "generalObservation": "Se requiere plan de acción inmediato para los hallazgos de seguridad detectados durante la visita de inspección preventiva realizada en la sucursal.",
+    "coordinates": "-33.4103,-70.5760", "timing": "1500"
+  },
+  {
+    "responseId": 128490, "companyId": 254, "formId": 100, "evaluationPointId": 902,
+    "auditableEntityId": null, "userId": 51,
+    "completedAt": "2026-07-20T16:45:00", "startedAt": null,
+    "score": null, "generalObservation": null,
+    "coordinates": null, "timing": null
+  }
+]

@@ -1,0 +1,4 @@
+[
+  { "id": 50, "names": "María", "lastNames": "González", "email": "maria.gonzalez@tocheck.cl", "position": "Inspectora de Prevención", "rut": "12.345.678-9" },
+  { "id": 51, "names": "Pedro", "lastNames": "Soto", "email": "pedro.soto@tocheck.cl", "position": "Auditor Senior", "rut": "9.876.543-2" }
+]

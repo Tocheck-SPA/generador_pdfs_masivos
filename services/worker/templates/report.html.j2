@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --primary: #2F6EE8;
+    --heading: #22223b;
+    --text: #374151;
+    --muted: #64748b;
+    --border: #e5e7eb;
+    --surface-muted: #f8f9fa;
+    --surface-input: #f7fafd;
+    --success: #10B981;
+    --warning: #f59e0b;
+    --error: #dc3545;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--text);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .doc { padding: 0; }
+
+  /* Encabezado */
+  .header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 16px; border-bottom: 3px solid var(--primary);
+    padding-bottom: 14px; margin-bottom: 18px;
+  }
+  .header .brand { display: flex; align-items: center; gap: 12px; }
+  .header .brand img { max-height: 46px; max-width: 150px; object-fit: contain; }
+  .header .title h1 { font-size: 18px; font-weight: 700; color: var(--heading); margin: 0 0 2px; letter-spacing: .3px; }
+  .header .title .code { color: var(--muted); font-size: 12px; }
+  .header .company { text-align: right; }
+  .header .company .name { font-weight: 700; color: var(--heading); font-size: 14px; }
+  .header .company .rid { color: var(--muted); font-size: 11px; margin-top: 2px; }
+
+  /* Grilla de metadatos */
+  .meta {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px;
+    background: var(--surface-input); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 18px; margin-bottom: 16px;
+  }
+  .meta .field { display: flex; flex-direction: column; }
+  .meta .label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .5px; font-weight: 600; }
+  .meta .value { color: var(--heading); font-size: 12.5px; font-weight: 500; }
+
+  .score-pill {
+    display: inline-block; background: var(--primary); color: #fff;
+    font-weight: 700; border-radius: 999px; padding: 3px 12px; font-size: 12px;
+  }
+
+  .block-obs {
+    border: 1px solid var(--border); border-left: 4px solid var(--primary);
+    border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; background: #fff;
+  }
+  .block-obs .label { color: var(--muted); font-size: 10px; text-transform: uppercase; font-weight: 600; letter-spacing: .5px; }
+
+  /* Secciones (ítems) */
+  .section { margin-bottom: 14px; break-inside: avoid; }
+  .section-head {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--surface-muted); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 14px; margin-bottom: 8px;
+  }
+  .section-head .name { font-weight: 700; color: var(--heading); font-size: 13.5px; }
+  .section-head .weight { color: var(--muted); font-size: 11px; }
+
+  .question {
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 14px; margin-bottom: 8px; break-inside: avoid; background: #fff;
+  }
+  .q-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+  .q-statement { font-weight: 600; color: var(--heading); font-size: 12.5px; }
+  .q-tooltip { color: var(--muted); font-size: 10.5px; margin-top: 2px; font-style: italic; }
+  .q-answer { flex-shrink: 0; text-align: right; }
+
+  .badge {
+    display: inline-block; border-radius: 6px; padding: 3px 10px;
+    font-size: 11px; font-weight: 600; color: #fff; white-space: nowrap;
+  }
+  .badge-neutral { background: #e5e7eb; color: #374151; }
+  .badge-success { background: var(--success); }
+  .badge-warning { background: var(--warning); color: #1f2937; }
+  .badge-error { background: var(--error); }
+  .q-score { color: var(--muted); font-size: 10.5px; margin-top: 3px; }
+
+  .q-obs { margin-top: 6px; font-size: 11.5px; color: var(--text); }
+  .q-obs .tag { color: var(--muted); font-weight: 600; }
+
+  .chips { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip {
+    background: #eff6ff; color: #1e40af; border: 1px solid #dbeafe;
+    border-radius: 6px; padding: 2px 8px; font-size: 10.5px; font-weight: 500;
+  }
+
+  .q-flags { margin-top: 5px; }
+  .flag { display: inline-block; font-size: 10px; color: var(--warning); font-weight: 600; margin-right: 8px; }
+
+  .images { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .images .ph, .images img {
+    width: 150px; height: 112px; border-radius: 8px; border: 1px solid var(--border); object-fit: cover;
+  }
+  .images .ph {
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    background: var(--surface-muted); color: var(--muted); font-size: 10px; padding: 6px;
+  }
+
+  /* Bloques auxiliares */
+  .aux { margin-top: 18px; break-inside: avoid; }
+  .aux h2 { font-size: 13px; font-weight: 700; color: var(--heading); margin: 0 0 8px; letter-spacing: .3px; }
+  .aux table { width: 100%; border-collapse: collapse; }
+  .aux th, .aux td {
+    text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); font-size: 11.5px;
+  }
+  .aux th { color: var(--muted); font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; background: var(--surface-muted); }
+
+  .prio { display: inline-block; border-radius: 6px; padding: 2px 8px; font-size: 10.5px; font-weight: 600; }
+  .prio-0 { background: #1976d2; color: #fff; }
+  .prio-1 { background: #F4BB44; color: #000; }
+  .prio-2 { background: #e53935; color: #fff; }
+  .prio-3 { background: #b71c1c; color: #fff; }
+
+  .footer { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 8px; color: var(--muted); font-size: 10px; display: flex; justify-content: space-between; }
+
+  .empty { color: var(--muted); font-style: italic; font-size: 11px; }
+</style>
+</head>
+{% macro answer_badge(answer) -%}
+  {%- if answer is none -%}
+    <span class="badge badge-neutral">—</span>
+  {%- else -%}
+    {%- if answer is iterable and answer is not string -%}
+      {%- set text = answer | join(', ') -%}
+    {%- else -%}
+      {%- set text = answer | string -%}
+    {%- endif -%}
+    {%- set low = text | lower -%}
+    {%- if low in ['sí', 'si', 'cumple', 'ok', 'aprobado', 'true'] -%}
+      <span class="badge badge-success">{{ text }}</span>
+    {%- elif low in ['parcial', 'medio', 'observado'] -%}
+      <span class="badge badge-warning">{{ text }}</span>
+    {%- elif low in ['no', 'no cumple', 'rechazado', 'false'] -%}
+      <span class="badge badge-error">{{ text }}</span>
+    {%- else -%}
+      <span class="badge badge-neutral">{{ text }}</span>
+    {%- endif -%}
+  {%- endif -%}
+{%- endmacro %}
+<body>
+<div class="doc">
+
+  <div class="header">
+    <div class="brand">
+      {% if r.form.logo and r.form.logo.startswith('data:') %}<img src="{{ r.form.logo }}" alt="">{% endif %}
+      <div class="title">
+        <h1>{{ r.form.name or 'Informe de checklist' }}</h1>
+        {% if r.form.code %}<div class="code">Código: {{ r.form.code }}</div>{% endif %}
+      </div>
+    </div>
+    <div class="company">
+      {% if r.company.logo and r.company.logo.startswith('data:') %}<img src="{{ r.company.logo }}" alt="">{% endif %}
+      <div class="name">{{ r.company.name or '—' }}</div>
+      <div class="rid">Respuesta N.º {{ r.response_id }}</div>
+    </div>
+  </div>
+
+  <div class="meta">
+    {% if r.evaluation_point %}
+    <div class="field"><span class="label">Punto de evaluación</span><span class="value">{{ r.evaluation_point.name or '—' }}</span></div>
+    {% if r.evaluation_point.address %}<div class="field"><span class="label">Dirección</span><span class="value">{{ r.evaluation_point.address }}</span></div>{% endif %}
+    {% if r.evaluation_point.zone %}<div class="field"><span class="label">Zona</span><span class="value">{{ r.evaluation_point.zone }}</span></div>{% endif %}
+    {% endif %}
+    {% if r.auditable_entity %}
+    <div class="field"><span class="label">Entidad auditable</span><span class="value">{{ r.auditable_entity.name or '—' }}{% if r.auditable_entity.identifier_code %} ({{ r.auditable_entity.identifier_code }}){% endif %}</span></div>
+    {% if r.auditable_entity.entity_type %}<div class="field"><span class="label">Tipo</span><span class="value">{{ r.auditable_entity.entity_type }}</span></div>{% endif %}
+    {% endif %}
+    {% if not r.evaluation_point and not r.auditable_entity %}
+    <div class="field"><span class="label">Ubicación / entidad</span><span class="value empty">Sin punto de evaluación ni entidad auditable</span></div>
+    {% endif %}
+    <div class="field"><span class="label">Fecha y hora</span><span class="value">{{ r.completed_at | fmt_datetime }}</span></div>
+    {% if r.started_at %}<div class="field"><span class="label">Hora de inicio</span><span class="value">{{ r.started_at | fmt_datetime }}</span></div>{% endif %}
+    {% if r.auditor %}<div class="field"><span class="label">Auditor</span><span class="value">{{ r.auditor.name or '' }} {{ r.auditor.last_name or '' }}{% if r.auditor.position %} · {{ r.auditor.position }}{% endif %}</span></div>{% endif %}
+    <div class="field"><span class="label">Ponderación general</span><span class="value"><span class="score-pill">{{ r.score | fmt_score }}{% if r.scale and r.score is not none %} <small>/ {{ r.scale }}</small>{% endif %}</span></span></div>
+  </div>
+
+  {% if r.general_observation %}
+  <div class="block-obs">
+    <div class="label">Observación general</div>
+    <div>{{ r.general_observation }}</div>
+  </div>
+  {% endif %}
+
+  {% for section in r.sections %}
+  <div class="section">
+    <div class="section-head">
+      <span class="name">{{ section.name }}</span>
+      {% if section.weight is not none %}<span class="weight">Ponderación del ítem: {{ section.weight | fmt_score }}</span>{% endif %}
+    </div>
+    {% for q in section.questions %}
+    <div class="question">
+      <div class="q-top">
+        <div>
+          <div class="q-statement">{{ q.statement }}</div>
+          {% if q.tooltip %}<div class="q-tooltip">{{ q.tooltip }}</div>{% endif %}
+        </div>
+        <div class="q-answer">
+          {{ answer_badge(q.answer) }}
+          {% if q.score is not none %}<div class="q-score">{{ q.score | fmt_score }} pts</div>{% endif %}
+        </div>
+      </div>
+      {% if q.observation %}<div class="q-obs"><span class="tag">Observación:</span> {{ q.observation }}</div>{% endif %}
+      {% if q.observation_options %}
+      <div class="chips">{% for opt in q.observation_options %}<span class="chip">{{ opt }}</span>{% endfor %}</div>
+      {% endif %}
+      {% if q.creates_ticket %}<div class="q-flags"><span class="flag">● Genera ticket</span></div>{% endif %}
+      {% if q.images %}
+      <div class="images">
+        {% for img in q.images %}
+          {% if img.data_uri %}<img src="{{ img.data_uri }}" alt="Evidencia">
+          {% else %}<div class="ph">Imagen no disponible</div>{% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="empty">Esta respuesta no contiene ítems ni preguntas registradas.</p>
+  {% endfor %}
+
+  {% if r.additional_answers %}
+  <div class="aux">
+    <h2>Preguntas adicionales</h2>
+    <table>
+      <thead><tr><th>Pregunta</th><th>Respuesta</th></tr></thead>
+      <tbody>
+        {% for a in r.additional_answers %}
+        <tr>
+          <td>{{ a.question or a.question_text or '—' }}</td>
+          <td>{% if a.answer is none %}—{% elif a.answer %}Sí{% else %}No{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if r.tickets %}
+  <div class="aux">
+    <h2>Tickets asociados</h2>
+    <table>
+      <thead><tr><th>Título</th><th>Estado</th><th>Prioridad</th><th>Creado</th></tr></thead>
+      <tbody>
+        {% for t in r.tickets %}
+        <tr>
+          <td>{{ t.title or ('Ticket #' ~ t.ticket_id) }}</td>
+          <td>{{ t.state or '—' }}</td>
+          <td>{% if t.priority is not none %}<span class="prio prio-{{ t.priority }}">P{{ t.priority }}</span>{% else %}—{% endif %}</td>
+          <td>{{ t.created_at | fmt_datetime }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if r.signatures %}
+  <div class="aux">
+    <h2>Firmas</h2>
+    <table>
+      <thead><tr><th>Firmante</th><th>Estado</th><th>Fecha de firma</th><th>Observación</th></tr></thead>
+      <tbody>
+        {% for s in r.signatures %}
+        <tr>
+          <td>{{ s.signer_name or '' }} {{ s.signer_last_name or '' }}</td>
+          <td>{{ s.status or '—' }}</td>
+          <td>{{ s.signed_at | fmt_datetime }}</td>
+          <td>{{ s.observation or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="q-tooltip">La imagen de la firma dibujada se incorporará cuando se identifique el campo correspondiente en la fuente.</p>
+  </div>
+  {% endif %}
+
+  <div class="footer">
+    <span>ToCheck Reportes · Respuesta N.º {{ r.response_id }}</span>
+    <span>{{ r.form.name or '' }}{% if r.company.name %} — {{ r.company.name }}{% endif %}</span>
+  </div>
+
+</div>
+</body>
+</html>

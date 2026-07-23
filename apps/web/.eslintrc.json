@@ -1,0 +1,7 @@
+{
+  "extends": ["next/core-web-vitals"],
+  "ignorePatterns": ["node_modules/", ".next/", "vitest.config.ts"],
+  "rules": {
+    "@next/next/no-html-link-for-pages": "off"
+  }
+}

@@ -1,0 +1,5 @@
+[
+  { "responseId": 128483, "questionId": 1005, "listTitle": "Incidencias", "options": "Ninguna" },
+  { "responseId": 128485, "questionId": 1001, "listTitle": "Tipo de hallazgo", "options": "[\"Extintor vencido\", \"Falta de señalética\"]" },
+  { "responseId": 128484, "questionId": 2003, "listTitle": "Componentes afectados", "options": "Neumático trasero, Suspensión" }
+]

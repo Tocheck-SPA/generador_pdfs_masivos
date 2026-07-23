@@ -1,0 +1,6 @@
+[
+  { "id": 900, "companyId": 254, "formId": 100, "name": "Sucursal Providencia", "address": "Av. Providencia 1234, Santiago", "country": "Chile", "zone": "Zona Centro", "lat": -33.4262, "long": -70.6156 },
+  { "id": 901, "companyId": 254, "formId": 100, "name": "Sucursal Las Condes", "address": "Av. Apoquindo 5000, Las Condes", "country": "Chile", "zone": "Zona Oriente", "lat": -33.4103, "long": -70.5760 },
+  { "id": 902, "companyId": 254, "formId": 100, "name": "Planta San Bernardo", "address": "Camino Industrial 890, San Bernardo", "country": "Chile", "zone": "Zona Sur", "lat": -33.5920, "long": -70.6990 },
+  { "id": 900, "companyId": 254, "formId": 101, "name": "Sucursal Providencia", "address": "Av. Providencia 1234, Santiago", "country": "Chile", "zone": "Zona Centro", "lat": -33.4262, "long": -70.6156 }
+]
