@@ -7,7 +7,14 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+
+
+class _SourceModel(BaseModel):
+    # La fuente (MySQL de ToCheck) devuelve enteros donde a veces esperamos texto
+    # (p. ej. `estado` de firma = 0/1). Coercionar números a str evita romper el job
+    # ante sorpresas de tipos en datos reales.
+    model_config = ConfigDict(coerce_numbers_to_str=True)
 
 
 class ReportFilters(BaseModel):
@@ -19,13 +26,13 @@ class ReportFilters(BaseModel):
     include_all_points: bool = True
 
 
-class SourceCompany(BaseModel):
+class SourceCompany(_SourceModel):
     id: int
     name: str
     logo: str | None = None
 
 
-class SourceForm(BaseModel):
+class SourceForm(_SourceModel):
     id: int
     company_id: int
     name: str
@@ -35,7 +42,7 @@ class SourceForm(BaseModel):
     welcome_message: str | None = None
 
 
-class SourceEvaluationPoint(BaseModel):
+class SourceEvaluationPoint(_SourceModel):
     id: int | None
     name: str | None = None
     address: str | None = None
@@ -50,7 +57,7 @@ class ResponseCount(BaseModel):
     total_evaluation_points: int
 
 
-class ResponseHeader(BaseModel):
+class ResponseHeader(_SourceModel):
     response_id: int
     company_id: int
     company_name: str | None = None
@@ -83,7 +90,7 @@ class ResponseHeader(BaseModel):
     timing: str | None = None
 
 
-class QuestionAnswerRow(BaseModel):
+class QuestionAnswerRow(_SourceModel):
     response_id: int
     response_question_id: int
     question_id: int
@@ -102,13 +109,13 @@ class QuestionAnswerRow(BaseModel):
     creates_ticket: bool | None = None
 
 
-class ResponseImageRow(BaseModel):
+class ResponseImageRow(_SourceModel):
     response_id: int
     question_id: int | None = None
     path: str
 
 
-class ResponseSignatureRow(BaseModel):
+class ResponseSignatureRow(_SourceModel):
     response_id: int
     signer_user_id: int | None = None
     signer_name: str | None = None
@@ -119,7 +126,7 @@ class ResponseSignatureRow(BaseModel):
     observation: str | None = None
 
 
-class AdditionalAnswerRow(BaseModel):
+class AdditionalAnswerRow(_SourceModel):
     response_id: int
     additional_question_id: int
     question: str | None = None
@@ -127,14 +134,14 @@ class AdditionalAnswerRow(BaseModel):
     answer_boolean: bool | None = None
 
 
-class ObservationOptionRow(BaseModel):
+class ObservationOptionRow(_SourceModel):
     response_id: int
     question_id: int | None = None
     list_title: str | None = None
     options: str | None = None  # texto | JSON | separado por comas
 
 
-class TicketRow(BaseModel):
+class TicketRow(_SourceModel):
     response_id: int
     ticket_id: int
     form_instance_id: int | None = None
