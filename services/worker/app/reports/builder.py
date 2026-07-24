@@ -28,7 +28,22 @@ from .model import (
     SignatureData,
     TicketData,
 )
+from .compliance import evaluate
 from .observation_options import parse_observation_options
+
+
+def _duration(started, completed) -> str | None:
+    if started is None or completed is None:
+        return None
+    try:
+        total = int((completed - started).total_seconds())
+    except (TypeError, ValueError):
+        return None
+    if total < 0:
+        return None
+    h, rem = divmod(total, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}"
 
 
 def _group_by_response(rows: list) -> dict[int, list]:
@@ -82,6 +97,7 @@ def build_report_data(
             section_order[item_name] = idx
             section_weight[item_name] = q.item_weight
             section_questions[item_name] = []
+        comp_label, comp_value = evaluate(q.answer, q.answer_type)
         report_q = ReportQuestion(
             question_id=q.question_id,
             response_question_id=q.response_question_id,
@@ -89,7 +105,10 @@ def build_report_data(
             statement=q.statement,
             question_type=q.question_type,
             answer=q.answer,
+            compliance_label=comp_label,
+            compliance_value=comp_value,
             score=q.score,
+            max_points=q.question_weight,
             observation=q.observation,
             tooltip=q.tooltip,
             requires_photo=q.requires_photo,
@@ -102,12 +121,31 @@ def build_report_data(
         section_questions[item_name].append(report_q)
 
     sections: list[ReportSection] = []
-    for name in sorted(section_order, key=lambda n: (section_order[n], n)):
+    for ordinal, name in enumerate(sorted(section_order, key=lambda n: (section_order[n], n)), start=1):
         qs = sorted(
             section_questions[name],
-            key=lambda q: (q.order if q.order is not None else 1_000_000, q.response_question_id),
+            key=lambda q: (q.order if q.order is not None else 1_000_000, q.question_id),
         )
-        sections.append(ReportSection(name=name, weight=section_weight[name], questions=qs))
+        # Numeración ítem.posición (p. ej. "1.5") por posición dentro del ítem.
+        for pos, q in enumerate(qs, start=1):
+            q.number = f"{ordinal}.{pos}"
+        # Cumplimiento del ítem = puntos obtenidos / puntos máximos de sus preguntas
+        # (rp.ponderacion / p.ponderacion), igual que el informe oficial de ToCheck.
+        # Nota obtenida = ponderación del ítem × cumplimiento.
+        weight = section_weight[name]
+        sum_max = sum(q.max_points for q in qs if q.max_points is not None)
+        sum_ach = sum(q.score for q in qs if q.max_points is not None and q.score is not None)
+        if sum_max > 0:
+            pct = sum_ach / sum_max * 100
+        else:
+            # Sin ponderaciones por pregunta (p. ej. fixtures): promedio de cumplimiento.
+            values = [q.compliance_value for q in qs if q.compliance_value is not None]
+            pct = (sum(values) / len(values) * 100) if values else None
+        obtained = (weight * pct / 100) if (weight is not None and pct is not None) else None
+        sections.append(ReportSection(
+            name=name, ordinal=ordinal, weight=weight,
+            obtained=obtained, compliance_pct=pct, questions=qs,
+        ))
 
     if not sections:
         warnings.append("La respuesta no contiene preguntas.")
@@ -144,6 +182,7 @@ def build_report_data(
         auditor=auditor,
         completed_at=header.completed_at,
         started_at=header.started_at,
+        duration=_duration(header.started_at, header.completed_at),
         score=header.score,
         scale=header.form_scale,
         general_observation=header.general_observation,
@@ -156,7 +195,8 @@ def build_report_data(
         ],
         signatures=[
             SignatureData(
-                signer_name=s.signer_name, signer_last_name=s.signer_last_name, status=s.status,
+                signer_name=s.signer_name, signer_last_name=s.signer_last_name,
+                signer_email=s.signer_email, signer_position=s.signer_position, status=s.status,
                 sent_at=s.sent_at, signed_at=s.signed_at, observation=s.observation,
             )
             for s in signatures

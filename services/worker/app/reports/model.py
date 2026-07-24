@@ -67,10 +67,15 @@ class ReportQuestion(BaseModel):
     question_id: int
     response_question_id: int
     order: int | None = None
+    number: str | None = None  # "1.5" = ítem.posición
     statement: str
     question_type: str | None = None
     answer: str | bool | int | float | list | None = None
-    score: float | None = None
+    # Etiqueta de cumplimiento según la lógica de ToCheck (Cumple / Cumple Parcial / No Cumple).
+    compliance_label: str | None = None
+    compliance_value: float | None = None  # 1.0 / 0.5 / 0.0
+    score: float | None = None             # puntos obtenidos (rp.ponderacion)
+    max_points: float | None = None        # puntos máximos (p.ponderacion)
     observation: str | None = None
     tooltip: str | None = None
     requires_photo: bool | None = None
@@ -83,7 +88,10 @@ class ReportQuestion(BaseModel):
 
 class ReportSection(BaseModel):
     name: str
-    weight: float | None = None
+    ordinal: int | None = None            # posición del ítem (1..N) para numerar preguntas
+    weight: float | None = None           # nota máxima (ponderación del ítem)
+    obtained: float | None = None         # nota obtenida
+    compliance_pct: float | None = None   # cumplimiento 0..100
     questions: list[ReportQuestion] = []
 
 
@@ -96,6 +104,8 @@ class AdditionalAnswer(BaseModel):
 class SignatureData(BaseModel):
     signer_name: str | None = None
     signer_last_name: str | None = None
+    signer_email: str | None = None
+    signer_position: str | None = None
     status: str | None = None
     sent_at: datetime | None = None
     signed_at: datetime | None = None
@@ -113,6 +123,7 @@ class ReportData(BaseModel):
     auditor: AuditorData | None = None
     completed_at: datetime
     started_at: datetime | None = None
+    duration: str | None = None  # HH:MM:SS (Fin - Inicio)
     score: float | None = None
     scale: str | None = None
     general_observation: str | None = None

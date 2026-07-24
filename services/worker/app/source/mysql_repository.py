@@ -52,6 +52,7 @@ class MySQLSourceRepository(SourceRepository):
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         self._asset_base_url = settings.source_asset_base_url or None
+        self._asset_local_dir = settings.source_asset_local_dir or None
         self._conn: pymysql.connections.Connection | None = None
 
     def _connection(self) -> pymysql.connections.Connection:
@@ -151,4 +152,5 @@ class MySQLSourceRepository(SourceRepository):
         return [m.map_ticket(r) for r in self._batched("tickets", response_ids)]
 
     def resolve_asset(self, path: str) -> SourceAsset:
-        return resolve_remote_asset(path, asset_base_url=self._asset_base_url)
+        return resolve_remote_asset(path, asset_base_url=self._asset_base_url,
+                                    local_dir=self._asset_local_dir)

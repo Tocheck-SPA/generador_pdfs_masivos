@@ -100,8 +100,10 @@ class QuestionAnswerRow(_SourceModel):
     order: int | None = None
     statement: str
     question_type: str | None = None
+    answer_type: int | None = None  # rp.tipo_resp: define el mapeo de respuesta a Cumple/No Cumple
     answer: str | None = None
-    score: float | None = None
+    score: float | None = None            # rp.ponderacion: puntos obtenidos
+    question_weight: float | None = None  # p.ponderacion: puntos máximos de la pregunta
     observation: str | None = None
     tooltip: str | None = None
     requires_photo: bool | None = None
@@ -120,6 +122,8 @@ class ResponseSignatureRow(_SourceModel):
     signer_user_id: int | None = None
     signer_name: str | None = None
     signer_last_name: str | None = None
+    signer_email: str | None = None
+    signer_position: str | None = None
     status: str | None = None
     sent_at: datetime | None = None
     signed_at: datetime | None = None

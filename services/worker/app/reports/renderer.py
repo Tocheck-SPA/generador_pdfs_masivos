@@ -41,6 +41,16 @@ def _fmt_score(value: float | None) -> str:
     return f"{value:.1f}"
 
 
+def _fmt_pct(value: float | None) -> str:
+    if value is None:
+        return "—"
+    rounded = round(float(value), 2)
+    if rounded.is_integer():
+        return f"{int(rounded)}%"
+    text = f"{rounded:.2f}".rstrip("0").rstrip(".")
+    return f"{text}%"
+
+
 class PdfRenderer:
     """Renderiza informes a PDF. Usar como context manager para reutilizar el navegador."""
 
@@ -52,6 +62,7 @@ class PdfRenderer:
         self._env.filters["fmt_datetime"] = _fmt_datetime
         self._env.filters["fmt_date"] = _fmt_date
         self._env.filters["fmt_score"] = _fmt_score
+        self._env.filters["fmt_pct"] = _fmt_pct
         self._template = self._env.get_template(template_name)
         self._timeout_ms = render_timeout_seconds * 1000
         self._pw = None

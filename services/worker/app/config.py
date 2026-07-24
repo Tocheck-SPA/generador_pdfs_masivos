@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     rds_db: str = Field(default="", alias="RDS_DB")
     # Base de imágenes de la fuente (para resolver rutas relativas). Punto de extensión.
     source_asset_base_url: str = Field(default="", alias="SOURCE_ASSET_BASE_URL")
+    # Directorio local con imágenes por nombre de archivo (fallback offline/pruebas).
+    source_asset_local_dir: str = Field(default="", alias="SOURCE_ASSET_LOCAL_DIR")
     fixtures_dir: str = Field(default=str(_REPO_ROOT / "fixtures"), alias="FIXTURES_DIR")
 
     # Worker

@@ -11,6 +11,7 @@ extensión explícito y devuelve `found=False` sin bloquear el job.
 from __future__ import annotations
 
 import mimetypes
+from pathlib import Path
 
 import httpx
 
@@ -20,7 +21,17 @@ _MAX_BYTES = 15 * 1024 * 1024  # límite de tamaño por imagen
 _TIMEOUT = 20.0
 
 
-def resolve_remote_asset(path: str, *, asset_base_url: str | None = None) -> SourceAsset:
+def resolve_remote_asset(
+    path: str, *, asset_base_url: str | None = None, local_dir: str | None = None
+) -> SourceAsset:
+    # 1) Fallback local por nombre de archivo (offline / pruebas / comparación).
+    if local_dir:
+        candidate = Path(local_dir) / Path(path).name
+        if candidate.exists():
+            ct, _ = mimetypes.guess_type(str(candidate))
+            return SourceAsset(path=path, found=True, content=candidate.read_bytes(),
+                               content_type=ct or "application/octet-stream")
+
     url: str | None = None
     if path.startswith("http://") or path.startswith("https://"):
         url = path

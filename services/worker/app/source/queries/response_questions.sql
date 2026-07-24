@@ -9,6 +9,7 @@ SELECT
     rp.tipo_resp,
     rp.ponderacion            AS ponderacion_respuesta,
     rp.ticket                 AS genera_ticket_respuesta,
+    p.ponderacion             AS ponderacion_pregunta,
     p.enunciado               AS enunciado_pregunta,
     p.tipo_pregunta,
     p.observacion             AS requiere_observacion_pregunta,
@@ -24,4 +25,5 @@ LEFT JOIN item i     ON i.id = rp.id_item
 LEFT JOIN item_pregunta ip ON ip.id_pregunta = p.id AND ip.id_item = i.id
 LEFT JOIN tooltips_pregunta tp ON tp.id_pregunta = p.id
 WHERE rp.id_respuesta = ANY(%(response_ids)s)
-ORDER BY rp.id_respuesta, i.ponderacion, ip.orden, rp.id;
+-- El orden de ítems sigue i.id (coincide con el orden del informe oficial de ToCheck).
+ORDER BY rp.id_respuesta, i.id, ip.orden, rp.id_pregunta;

@@ -84,8 +84,10 @@ def map_question(r: dict) -> QuestionAnswerRow:
         question_id=r["id_pregunta"], item_id=r.get("id_item"), item_name=r.get("nombre_item"),
         item_weight=as_float(r.get("ponderacion_item")), order=r.get("orden_pregunta"),
         statement=r.get("enunciado_pregunta") or "", question_type=r.get("tipo_pregunta"),
+        answer_type=r.get("tipo_resp"),
         answer=(str(r["valor_respuesta"]) if r.get("valor_respuesta") is not None else None),
         score=as_float(r.get("ponderacion_respuesta")),
+        question_weight=as_float(r.get("ponderacion_pregunta")),
         observation=r.get("observacion_respuesta"), tooltip=r.get("tooltip_pregunta"),
         requires_photo=to_bool(r.get("requiere_foto_pregunta")),
         requires_observation=to_bool(r.get("requiere_observacion_pregunta")),
@@ -101,6 +103,7 @@ def map_signature(r: dict) -> ResponseSignatureRow:
     return ResponseSignatureRow(
         response_id=r["id_respuesta"], signer_user_id=r.get("id_usuario_firmador"),
         signer_name=r.get("nombre_firmador"), signer_last_name=r.get("apellido_firmador"),
+        signer_email=r.get("email_firmador"), signer_position=r.get("cargo_firmador"),
         status=r.get("estado_firma"), sent_at=r.get("fecha_envio_firma"),
         signed_at=r.get("fecha_firma"), observation=r.get("observacion_firma"),
     )

@@ -6,7 +6,9 @@ SELECT
     rff.fecha_firma,
     rff.observacion      AS observacion_firma,
     uf.nombres           AS nombre_firmador,
-    uf.apellidos         AS apellido_firmador
+    uf.apellidos         AS apellido_firmador,
+    uf.email             AS email_firmador,
+    uf.cargo             AS cargo_firmador
 FROM respuesta_formulario_firmas rff
 LEFT JOIN usuario uf ON uf.id = rff.id_usuario_firmador
 WHERE rff.id_respuesta = ANY(%(response_ids)s)
