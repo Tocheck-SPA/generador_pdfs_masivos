@@ -20,7 +20,8 @@ from .source.models import ReportFilters
 _log = get_logger("main")
 
 
-def _demo(company_id: int, form_id: int, date_from: str, date_to_exclusive: str) -> int:
+def _demo(company_id: int, form_id: int, date_from: str, date_to_exclusive: str,
+          recipients: list[str] | None = None) -> int:
     settings = get_settings()
     repo = build_source_repository(settings)
     storage = build_storage(settings)
@@ -43,7 +44,7 @@ def _demo(company_id: int, form_id: int, date_from: str, date_to_exclusive: str)
     forms = {f.id: f.name for f in repo.list_forms(company_id)}
     ctx = JobContext(
         job_id="demo", filters=filters, response_ids=response_ids,
-        recipients=["operaciones@cliente.cl", "mantenimiento@cliente.cl"],
+        recipients=recipients or ["operaciones@cliente.cl", "mantenimiento@cliente.cl"],
         delivery_mode="auto",
         company_name=companies.get(company_id, "Empresa"),
         form_name=forms.get(form_id, "Formulario"),
@@ -143,6 +144,8 @@ def main(argv: list[str] | None = None) -> int:
     demo.add_argument("--form-id", type=int, default=100)
     demo.add_argument("--date-from", default="2026-07-01T00:00:00")
     demo.add_argument("--date-to-exclusive", default="2026-08-01T00:00:00")
+    demo.add_argument("--recipients", default=None,
+                      help="Correos separados por coma. Por defecto usa direcciones de prueba genéricas.")
 
     cat = sub.add_parser("catalog", help="Lista empresas/formularios/puntos de la fuente")
     cat.add_argument("--company-id", type=int, default=None)
@@ -157,7 +160,8 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     if args.command == "demo":
-        return _demo(args.company_id, args.form_id, args.date_from, args.date_to_exclusive)
+        recipients = [r.strip() for r in args.recipients.split(",")] if args.recipients else None
+        return _demo(args.company_id, args.form_id, args.date_from, args.date_to_exclusive, recipients)
     if args.command == "catalog":
         return _catalog(args.company_id, args.form_id, args.date_from, args.date_to_exclusive)
     if args.command == "run":
