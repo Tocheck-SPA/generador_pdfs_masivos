@@ -108,7 +108,7 @@ def _catalog(company_id: int | None, form_id: int | None, date_from: str, date_t
     return 0
 
 
-def _run() -> int:
+def _run(max_iterations: int | None = None) -> int:
     from .jobs.runner import run_worker_loop
 
     settings = get_settings()
@@ -116,7 +116,7 @@ def _run() -> int:
         print("DATABASE_URL no está definida; el modo 'run' requiere Neon. Use 'demo' para fixtures.")
         return 1
     log_context(_log, 20, "worker iniciado", worker_id=settings.worker_id)
-    run_worker_loop(settings)
+    run_worker_loop(settings, max_iterations=max_iterations)
     return 0
 
 
@@ -150,7 +150,9 @@ def main(argv: list[str] | None = None) -> int:
     cat.add_argument("--date-from", default="2026-01-01T00:00:00")
     cat.add_argument("--date-to-exclusive", default="2027-01-01T00:00:00")
 
-    sub.add_parser("run", help="Loop de worker sobre Neon")
+    run_p = sub.add_parser("run", help="Loop de worker sobre Neon")
+    run_p.add_argument("--max-iterations", type=int, default=None,
+                       help="Nº de ciclos de poll antes de salir (para pruebas controladas).")
     sub.add_parser("health", help="Estado de dependencias")
 
     args = parser.parse_args(argv)
@@ -159,7 +161,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "catalog":
         return _catalog(args.company_id, args.form_id, args.date_from, args.date_to_exclusive)
     if args.command == "run":
-        return _run()
+        return _run(args.max_iterations)
     if args.command == "health":
         return _health()
     return 1
