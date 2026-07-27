@@ -5,10 +5,18 @@ generar un PDF por respuesta, agruparlas en un ZIP y enviarlas por correo** a un
 varios destinatarios. No modifica el sistema principal de ToCheck: la base fuente se
 consulta **solo lectura**.
 
-> Estado: **MVP funcional**. Corre de punta a punta en local con *fixtures*, sin
-> credenciales ni servicios externos. Ver [Criterios de aceptación](#criterios-de-aceptación).
+> Estado: **listo para handoff**. El flujo de datos, snapshots, PDF/ZIP y configuración
+> portable están implementados. La validación cloud final depende de las cuentas de TI.
 
 ---
+
+## Estado actual
+
+El flujo de snapshots en Neon, la ingesta acotada por empresa y la generacion
+de PDF/ZIP estan implementados y validados localmente. Neon ya tiene aplicadas
+las migraciones `0001` a `0004`. El proyecto esta listo para handoff; queda
+pendiente solamente el despliegue y la validacion final de la infraestructura
+cloud (Vercel + Lambda o Cloud Run).
 
 ## Despliegue portable
 
@@ -21,8 +29,8 @@ de configuración y handoff está en [docs/worker-portability-handoff.md](docs/w
 
 ```
 ┌───────────────────────────┐        ┌───────────────────────────┐
-│  Next.js (Vercel)          │        │  Worker Python (Cloud Run) │
-│  UI · Auth · API rápida    │        │  Fuente → PDF → ZIP → R2   │
+│  Next.js (Vercel)          │        │  Worker Python              │
+│  UI · Auth · API rápida    │        │  Lambda / Cloud Run         │
 │  conteo · creación de jobs │        │  → correo (Resend)         │
 └─────────────┬──────────────┘        └───────┬───────────┬───────┘
               │                                │           │
@@ -30,7 +38,7 @@ de configuración y handoff está en [docs/worker-portability-handoff.md](docs/w
      ┌──────────────────┐            ┌───────────────┐ ┌──────────┐
      │ Neon PostgreSQL  │◀───────────│  ToCheck DB    │ │ R2 /     │
      │ jobs · items ·   │  cola       │  (solo lectura)│ │ Resend   │
-     │ artifacts · ...  │  persistente└───────────────┘ └──────────┘
+      │ artifacts · ...  │  persistente└───────────────┘ └──────────┘
      └──────────────────┘
 ```
 
@@ -42,6 +50,30 @@ de configuración y handoff está en [docs/worker-portability-handoff.md](docs/w
 - **Neon conserva el snapshot diario de respuestas necesario para los informes**, además
   de los metadatos operativos. Las imágenes no se copian: se resuelven desde sus URLs públicas.
 
+## Flujo de datos productivo
+
+```text
+MySQL/RDS de ToCheck
+        |  ingesta desde una maquina con IP autorizada
+        v
+Neon: snapshots + cola de jobs + artefactos
+        ^                         |
+        |                         v
+UI Next.js en Vercel  --->  Worker Lambda/Cloud Run
+                                      |
+                                      v
+                            R2 o S3 + correo
+```
+
+- La ingesta consulta MySQL en modo solo lectura y se ejecuta por empresa.
+- `SOURCE_COMPANY_ID` evita cargar toda la fuente; el comando exige empresa
+  explicita y permite rangos de fecha.
+- Web y worker productivos usan `SOURCE_ADAPTER=snapshot` y consultan Neon.
+- Las imagenes publicas se resuelven con las rutas publicas de ToCheck,
+  incluyendo logo de empresa y logo oficial de ToCheck.
+- La UI muestra la fecha de ultima actualizacion del snapshot y advierte si el
+  rango solicitado no esta cubierto.
+
 ## Estructura del repositorio
 
 ```
@@ -49,10 +81,10 @@ apps/web/            Frontend Next.js (App Router, TS estricto, Auth.js, Zod)
 services/worker/     Worker Python (psycopg3, Pydantic, Jinja2, Playwright, pypdf, Pillow, boto3)
   app/source/        SourceRepository (fixture + postgres) + consultas .sql divididas
   app/reports/       Modelo ReportData, builder, hashing, imágenes, render, ZIP
-  app/storage/       Local + Cloudflare R2
+  app/storage/       Local + Cloudflare R2 + AWS S3
   app/email/         Consola + Resend
   templates/         Plantilla Jinja2 del informe (fiel al Design System)
-  tests/             Pytest (35 pruebas + integración de PDF real)
+  tests/             Pytest (suite unitaria + integración de PDF real)
 database/migrations/ Esquema versionado de Neon
 fixtures/            Datos de prueba COMPARTIDOS por web y worker
 docs/                Despliegue, decisiones, campos pendientes de la fuente
@@ -139,11 +171,94 @@ El adaptador reutiliza las 12 consultas `.sql` traduciendo el dialecto (`= ANY(.
 La ingesta reutiliza esas consultas, guarda el snapshot en Neon y el worker productivo ya no
 necesita conexión directa a AWS.
 
+## Produccion: snapshot diario en Neon
+
+La maquina que tiene la IP autorizada en AWS ejecuta la ingesta contra MySQL.
+El worker productivo no consulta RDS: usa `SOURCE_ADAPTER=snapshot` y lee los
+datos ya guardados en Neon.
+
+Para actualizar una empresa:
+
+```bash
+cd services/worker
+python -m app.main ingest --company-id 254 --lookback-days 7
+```
+
+La corrida incremental continua desde la ultima sincronizacion completada. Para
+un backfill controlado se pueden indicar `--date-from` y `--date-to-exclusive`.
+
+La UI consulta el estado del snapshot y muestra la ultima actualizacion y si el
+rango solicitado esta cubierto.
+
+## Worker bajo demanda
+
+La UI crea primero el job en Neon y luego lo despacha segun:
+
+```env
+WORKER_DISPATCH_PROVIDER=disabled|gcp_cloud_run|aws_lambda
+```
+
+El contrato neutral es:
+
+```text
+python -m app.main run-job --job-id UUID
+```
+
+Lambda recibe `{ "schemaVersion": 1, "jobId": "UUID" }`. El claim dirigido
+por `jobId` mantiene la seguridad ante reintentos y evita duplicar el correo.
+
+## Artefactos y descargas
+
+Los PDF, ZIP y manifest se registran en Neon con proveedor, bucket y clave de
+almacenamiento. El backend web genera URLs firmadas bajo demanda:
+
+```env
+STORAGE_BACKEND=local|r2|s3
+```
+
+Ejemplos:
+
+```env
+# Lambda + S3
+WORKER_DISPATCH_PROVIDER=aws_lambda
+STORAGE_BACKEND=s3
+AWS_S3_BUCKET=tocheck-reportes
+AWS_S3_REGION=us-east-1
+
+# Cloud Run + R2
+WORKER_DISPATCH_PROVIDER=gcp_cloud_run
+STORAGE_BACKEND=r2
+R2_BUCKET=tocheck-reportes
+```
+
+Los artefactos existentes mantienen su proveedor historico, por lo que cambiar
+el backend no rompe las descargas anteriores.
+
+## Handoff de infraestructura
+
+### UI en Vercel
+
+- Root Directory: `apps/web`.
+- `DATABASE_URL` apunta a Neon.
+- `SOURCE_ADAPTER=snapshot`.
+- `WORKER_DISPATCH_PROVIDER=aws_lambda` cuando Lambda esté disponible.
+- Vercel usa OIDC para invocar Lambda; no se requieren access keys permanentes.
+
+### Worker en AWS
+
+TI debe publicar `services/worker/Dockerfile.lambda` en ECR y crear una Lambda
+basada en esa imagen. La función recibe `{ "schemaVersion": 1, "jobId": "UUID" }`
+y usa las mismas variables de Neon, almacenamiento y correo del worker.
+
+No se requiere acceso del worker a MySQL/RDS. La única validación pendiente de
+infraestructura es publicar la imagen, configurar IAM/OIDC y ejecutar un smoke
+test real desde la UI.
+
 ## Pruebas
 
 ```bash
 # Worker
-cd services/worker && .venv/Scripts/python -m pytest         # 35 pruebas
+cd services/worker && .venv/Scripts/python -m pytest
 cd services/worker && .venv/Scripts/python -m ruff check app tests
 
 # Web
@@ -153,25 +268,33 @@ cd apps/web && npm run typecheck && npm run lint && npm run test && npm run buil
 Las pruebas del *claim* atómico contra Postgres se activan con `TEST_DATABASE_URL`
 (ver `services/worker/tests/test_db_claim.py`).
 
+La suite también cubre el contrato Lambda, el claim dirigido por `jobId`, la
+resolución de imágenes/logos, el almacenamiento S3 y la ingesta incremental.
+
 ## Seguridad y minimización de datos
 
 - Usuario de solo lectura en la fuente, conexión SSL, `statement_timeout`, consultas
   parametrizadas, límites de fecha/respuestas/destinatarios.
 - **No se muestra ni persiste RUT**, ni correos personales innecesarios, ni coordenadas
   por defecto. Los logs son JSON y filtran claves sensibles y URLs firmadas.
-- Bucket R2 privado con URLs prefirmadas temporales.
+- Buckets R2/S3 privados con URLs prefirmadas temporales.
 
 ## Documentación
 
-- [docs/deployment.md](docs/deployment.md) — despliegue paso a paso (Neon, Vercel, Cloud Run, R2, Resend).
+- [docs/deployment.md](docs/deployment.md) — despliegue paso a paso (Neon, Vercel, Lambda/Cloud Run, R2/S3, Resend).
+- [docs/worker-portability-handoff.md](docs/worker-portability-handoff.md) — handoff para TI: Lambda, Cloud Run, OIDC, R2 y S3.
 - [docs/decisions.md](docs/decisions.md) — decisiones técnicas y consultas SQL implementadas.
 - [docs/pending-fields.md](docs/pending-fields.md) — campos de la fuente por confirmar y puntos de extensión.
 
 ## Criterios de aceptación
 
-Verificado en local (ver informe de entrega): login, selección dependiente
+Verificado localmente: login, selección dependiente
 empresa→formulario→puntos, conteo, creación inmediata de job, procesamiento por el
 worker sin duplicar preguntas por fotos/firmas, PDF por respuesta con fotografías
 (tolerando fallidas), preguntas adicionales, metadata de firmas y tickets, ZIP con
 manifest, subida al almacenamiento, correo (adjunto o enlace según tamaño), progreso,
 historial, descarga, idempotencia de correo y respeto del Design System.
+
+La validación cloud final debe comprobar una corrida real desde la UI, el
+procesamiento Lambda o Cloud Run, la descarga del ZIP mediante URL firmada y el
+envío de correo con las variables productivas.
