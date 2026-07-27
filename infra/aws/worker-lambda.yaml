@@ -1,0 +1,403 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  ToCheck Reportes — worker en AWS Lambda (imagen Docker en ECR).
+  No incluye API Gateway ni VPC. Almacenamiento típico: Cloudflare R2.
+  Correo: Resend. Cola/datos: Neon (fuera de este stack).
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: { default: "Nombres y región lógica" }
+        Parameters: [ProjectName, FunctionName, EcrRepositoryName]
+      - Label: { default: "Imagen Lambda" }
+        Parameters: [ImageUri, MemorySizeMB, TimeoutSeconds, EphemeralStorageMB]
+      - Label: { default: "OIDC Vercel (invoke)" }
+        Parameters:
+          - VercelTeamSlug
+          - VercelProjectName
+          - VercelEnvironment
+          - ExistingOidcProviderArn
+      - Label: { default: "Variables del worker (Lambda)" }
+        Parameters:
+          - DatabaseUrl
+          - SourceAdapter
+          - StorageBackend
+          - R2AccountId
+          - R2AccessKeyId
+          - R2SecretAccessKey
+          - R2Bucket
+          - R2Endpoint
+          - R2Region
+          - EmailBackend
+          - ResendApiKey
+          - EmailFrom
+          - EmailReplyTo
+          - SourceAssetBaseUrl
+          - SourceLogoBaseUrl
+          - TocheckLogoUrl
+          - MaxResponsesPerJob
+          - PdfMaxConcurrency
+          - PdfRenderTimeoutSeconds
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: tocheck-reportes
+    Description: Prefijo para nombres de recursos IAM/logs.
+
+  FunctionName:
+    Type: String
+    Default: tocheck-reportes-worker
+    Description: Nombre de la función Lambda.
+
+  EcrRepositoryName:
+    Type: String
+    Default: tocheck-reportes-worker
+    Description: Nombre del repositorio ECR.
+
+  ImageUri:
+    Type: String
+    Default: ""
+    Description: >
+      URI completa de la imagen en ECR (cuenta.dkr.ecr.región.amazonaws.com/repo:tag).
+      Vacío = solo crea ECR + IAM (fase 1). Con valor = crea/actualiza la Lambda (fase 2).
+
+  MemorySizeMB:
+    Type: Number
+    Default: 3008
+    MinValue: 1024
+    MaxValue: 10240
+    Description: Memoria Lambda (Playwright/Chromium necesita bastante).
+
+  TimeoutSeconds:
+    Type: Number
+    Default: 900
+    MinValue: 60
+    MaxValue: 900
+    Description: Timeout en segundos (máx. Lambda = 900).
+
+  EphemeralStorageMB:
+    Type: Number
+    Default: 4096
+    MinValue: 512
+    MaxValue: 10240
+    Description: Disco efímero /tmp para PDFs y ZIP temporales.
+
+  VercelTeamSlug:
+    Type: String
+    Description: Team slug de Vercel (issuer oidc.vercel.com/<slug>).
+
+  VercelProjectName:
+    Type: String
+    Description: Nombre del proyecto Vercel (claim sub).
+
+  VercelEnvironment:
+    Type: String
+    Default: production
+    AllowedValues: [production, preview, development]
+    Description: Environment de Vercel permitido para asumir el rol.
+
+  ExistingOidcProviderArn:
+    Type: String
+    Default: ""
+    Description: >
+      ARN de un OIDC provider ya existente para oidc.vercel.com/<team>.
+      Vacío = este stack crea el provider.
+
+  DatabaseUrl:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Neon DATABASE_URL (?sslmode=require).
+
+  SourceAdapter:
+    Type: String
+    Default: snapshot
+    AllowedValues: [snapshot, fixture, postgres, mysql]
+    Description: En producción usar snapshot.
+
+  StorageBackend:
+    Type: String
+    Default: r2
+    AllowedValues: [r2, s3, local]
+    Description: Backend de artefactos (recomendado r2).
+
+  R2AccountId:
+    Type: String
+    Default: ""
+
+  R2AccessKeyId:
+    Type: String
+    Default: ""
+    NoEcho: true
+
+  R2SecretAccessKey:
+    Type: String
+    Default: ""
+    NoEcho: true
+
+  R2Bucket:
+    Type: String
+    Default: ""
+
+  R2Endpoint:
+    Type: String
+    Default: ""
+    Description: https://<account>.r2.cloudflarestorage.com
+
+  R2Region:
+    Type: String
+    Default: auto
+
+  EmailBackend:
+    Type: String
+    Default: resend
+    AllowedValues: [resend, console]
+
+  ResendApiKey:
+    Type: String
+    Default: ""
+    NoEcho: true
+
+  EmailFrom:
+    Type: String
+    Default: reportes@tocheck.cl
+
+  EmailReplyTo:
+    Type: String
+    Default: ""
+
+  SourceAssetBaseUrl:
+    Type: String
+    Default: https://tocheck.s3.amazonaws.com
+
+  SourceLogoBaseUrl:
+    Type: String
+    Default: https://app.tocheck.cl/public/upload/files/logo_empresa
+
+  TocheckLogoUrl:
+    Type: String
+    Default: https://app.tocheck.cl/public/img_tocheck/logo_negro.png
+
+  MaxResponsesPerJob:
+    Type: Number
+    Default: 1000
+
+  PdfMaxConcurrency:
+    Type: Number
+    Default: 2
+
+  PdfRenderTimeoutSeconds:
+    Type: Number
+    Default: 60
+
+Conditions:
+  CreateLambda: !Not [!Equals [!Ref ImageUri, ""]]
+  CreateOidcProvider: !Equals [!Ref ExistingOidcProviderArn, ""]
+  UseExistingOidcProvider: !Not [!Equals [!Ref ExistingOidcProviderArn, ""]]
+
+Resources:
+  WorkerEcrRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Ref EcrRepositoryName
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      ImageTagMutability: MUTABLE
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 10 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Component
+          Value: worker
+
+  WorkerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${FunctionName}
+      RetentionInDays: 30
+
+  WorkerExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-lambda-exec
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: WorkerLogs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !GetAtt WorkerLogGroup.Arn
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  VercelOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: CreateOidcProvider
+    Properties:
+      Url: !Sub https://oidc.vercel.com/${VercelTeamSlug}
+      ClientIdList:
+        - !Sub https://vercel.com/${VercelTeamSlug}
+      ThumbprintList:
+        # AWS exige al menos un thumbprint; con OIDC moderno la validación
+        # principal es por el certificado de la URL del issuer.
+        - 9e99a48a9960b14926bb7f3b02e22da2b0ab7280
+
+  VercelInvokeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-vercel-invoke
+      # Document como JSON para poder interpolar las claves OIDC (team slug).
+      AssumeRolePolicyDocument: !Sub
+        - |
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": { "Federated": "${OidcArn}" },
+                "Action": "sts:AssumeRoleWithWebIdentity",
+                "Condition": {
+                  "StringEquals": {
+                    "oidc.vercel.com/${VercelTeamSlug}:aud": "https://vercel.com/${VercelTeamSlug}"
+                  },
+                  "StringLike": {
+                    "oidc.vercel.com/${VercelTeamSlug}:sub": "owner:${VercelTeamSlug}:project:${VercelProjectName}:environment:${VercelEnvironment}"
+                  }
+                }
+              }
+            ]
+          }
+        - OidcArn: !If
+            - UseExistingOidcProvider
+            - !Ref ExistingOidcProviderArn
+            - !Ref VercelOidcProvider
+          VercelTeamSlug: !Ref VercelTeamSlug
+          VercelProjectName: !Ref VercelProjectName
+          VercelEnvironment: !Ref VercelEnvironment
+      Policies:
+        - PolicyName: InvokeWorkerLambda
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource:
+                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FunctionName}
+                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FunctionName}:*
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  WorkerLambda:
+    Type: AWS::Lambda::Function
+    Condition: CreateLambda
+    DependsOn:
+      - WorkerLogGroup
+      - WorkerExecutionRole
+    Properties:
+      FunctionName: !Ref FunctionName
+      PackageType: Image
+      Role: !GetAtt WorkerExecutionRole.Arn
+      Code:
+        ImageUri: !Ref ImageUri
+      MemorySize: !Ref MemorySizeMB
+      Timeout: !Ref TimeoutSeconds
+      EphemeralStorage:
+        Size: !Ref EphemeralStorageMB
+      Architectures:
+        - x86_64
+      Description: ToCheck Reportes worker (PDF/ZIP/email)
+      Environment:
+        Variables:
+          DATABASE_URL: !Ref DatabaseUrl
+          SOURCE_ADAPTER: !Ref SourceAdapter
+          STORAGE_BACKEND: !Ref StorageBackend
+          R2_ACCOUNT_ID: !Ref R2AccountId
+          R2_ACCESS_KEY_ID: !Ref R2AccessKeyId
+          R2_SECRET_ACCESS_KEY: !Ref R2SecretAccessKey
+          R2_BUCKET: !Ref R2Bucket
+          R2_ENDPOINT: !Ref R2Endpoint
+          R2_REGION: !Ref R2Region
+          EMAIL_BACKEND: !Ref EmailBackend
+          RESEND_API_KEY: !Ref ResendApiKey
+          EMAIL_FROM: !Ref EmailFrom
+          EMAIL_REPLY_TO: !Ref EmailReplyTo
+          SOURCE_ASSET_BASE_URL: !Ref SourceAssetBaseUrl
+          SOURCE_LOGO_BASE_URL: !Ref SourceLogoBaseUrl
+          TOCHECK_LOGO_URL: !Ref TocheckLogoUrl
+          MAX_RESPONSES_PER_JOB: !Sub "${MaxResponsesPerJob}"
+          PDF_MAX_CONCURRENCY: !Sub "${PdfMaxConcurrency}"
+          PDF_RENDER_TIMEOUT_SECONDS: !Sub "${PdfRenderTimeoutSeconds}"
+          WORKER_ID: !Sub lambda-${FunctionName}
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Component
+          Value: worker
+
+Outputs:
+  EcrRepositoryUri:
+    Description: URI base del repo ECR (sin tag). Push la imagen aquí.
+    Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${WorkerEcrRepository}
+
+  EcrRepositoryName:
+    Description: Nombre del repositorio ECR.
+    Value: !Ref WorkerEcrRepository
+
+  LambdaFunctionName:
+    Condition: CreateLambda
+    Description: Nombre de la Lambda (AWS_LAMBDA_FUNCTION_NAME en Vercel).
+    Value: !Ref WorkerLambda
+
+  LambdaFunctionArn:
+    Condition: CreateLambda
+    Description: ARN de la Lambda.
+    Value: !GetAtt WorkerLambda.Arn
+
+  VercelInvokeRoleArn:
+    Description: ARN del rol para Vercel (AWS_ROLE_ARN en Vercel).
+    Value: !GetAtt VercelInvokeRole.Arn
+
+  AwsRegion:
+    Description: Región del stack (AWS_REGION en Vercel).
+    Value: !Ref AWS::Region
+
+  VercelEnvHint:
+    Description: Variables a pegar en Vercel cuando la Lambda exista.
+    Value: !Sub
+      - |
+        WORKER_DISPATCH_PROVIDER=aws_lambda
+        AWS_REGION=${Region}
+        AWS_ROLE_ARN=${RoleArn}
+        AWS_LAMBDA_FUNCTION_NAME=${FunctionName}
+      - Region: !Ref AWS::Region
+        RoleArn: !GetAtt VercelInvokeRole.Arn
+        FunctionName: !Ref FunctionName

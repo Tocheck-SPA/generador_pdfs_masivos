@@ -246,7 +246,8 @@ el backend no rompe las descargas anteriores.
 
 ### Worker en AWS
 
-TI debe publicar `services/worker/Dockerfile.lambda` en ECR y crear una Lambda
+TI puede usar el CloudFormation en `infra/aws/` (ECR + Lambda + rol OIDC) o
+publicar `services/worker/Dockerfile.lambda` en ECR y crear una Lambda
 basada en esa imagen. La función recibe `{ "schemaVersion": 1, "jobId": "UUID" }`
 y usa las mismas variables de Neon, almacenamiento y correo del worker.
 

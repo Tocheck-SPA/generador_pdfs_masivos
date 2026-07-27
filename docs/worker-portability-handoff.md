@@ -81,6 +81,10 @@ La imagen está en `services/worker/Dockerfile.lambda` y usa el mismo núcleo
 Python/Playwright que Cloud Run, pero con `awslambdaric` y
 `app.lambda_handler.handler`.
 
+Infra como código (ECR + Lambda + OIDC Vercel, sin API Gateway/VPC):
+ver [infra/aws/README.md](../infra/aws/README.md) y
+[infra/aws/worker-lambda.yaml](../infra/aws/worker-lambda.yaml).
+
 Variables principales en Vercel:
 
 ```env
