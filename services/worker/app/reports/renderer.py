@@ -14,6 +14,7 @@ from playwright.sync_api import sync_playwright
 from .model import ReportData
 
 _TEMPLATES_DIR = Path(__file__).resolve().parents[2] / "templates"
+_DEFAULT_TOCHECK_LOGO_URL = "https://app.tocheck.cl/public/img_tocheck/logo_negro.png"
 
 _MONTHS_ES = [
     "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -54,7 +55,12 @@ def _fmt_pct(value: float | None) -> str:
 class PdfRenderer:
     """Renderiza informes a PDF. Usar como context manager para reutilizar el navegador."""
 
-    def __init__(self, template_name: str = "report.html.j2", render_timeout_seconds: int = 60) -> None:
+    def __init__(
+        self,
+        template_name: str = "report.html.j2",
+        render_timeout_seconds: int = 60,
+        tocheck_logo_url: str = _DEFAULT_TOCHECK_LOGO_URL,
+    ) -> None:
         self._env = Environment(
             loader=FileSystemLoader(str(_TEMPLATES_DIR)),
             autoescape=select_autoescape(["html", "xml", "j2"]),
@@ -65,6 +71,7 @@ class PdfRenderer:
         self._env.filters["fmt_pct"] = _fmt_pct
         self._template = self._env.get_template(template_name)
         self._timeout_ms = render_timeout_seconds * 1000
+        self._tocheck_logo_url = tocheck_logo_url
         self._pw = None
         self._browser = None
 
@@ -80,7 +87,7 @@ class PdfRenderer:
             self._pw.stop()
 
     def render_html(self, data: ReportData) -> str:
-        return self._template.render(r=data)
+        return self._template.render(r=data, tocheck_logo_url=self._tocheck_logo_url)
 
     def render_pdf(self, data: ReportData) -> bytes:
         if self._browser is None:

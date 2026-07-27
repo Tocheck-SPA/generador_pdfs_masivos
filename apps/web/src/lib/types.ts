@@ -29,6 +29,14 @@ export interface CountResult {
   totalEvaluationPoints: number;
 }
 
+export interface SourceSnapshotStatus {
+  isSnapshot: boolean;
+  lastSuccessfulSyncAt: string | null;
+  coveredFrom: string | null;
+  coveredToExclusive: string | null;
+  isCovered: boolean;
+}
+
 export interface ResponseRef {
   responseId: number;
   evaluationPointId: number | null;

@@ -63,6 +63,18 @@ def test_claim_pending_job(conn):
     assert claimed["attempt_count"] == 1
 
 
+def test_claim_by_id_does_not_take_another_job(conn):
+    from app.database import jobs as jdb
+
+    target_id = _insert_job(conn, status="pending")
+    _insert_job(conn, status="pending")
+    claimed = jdb.claim_job_by_id(conn, str(target_id), worker_id="target", stale_seconds=300)
+
+    assert claimed is not None
+    assert str(claimed["id"]) == str(target_id)
+    assert claimed["locked_by"] == "target"
+
+
 def test_does_not_reclaim_fresh_processing(conn):
     from app.database import jobs as jdb
 

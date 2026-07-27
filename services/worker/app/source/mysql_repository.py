@@ -101,6 +101,17 @@ class MySQLSourceRepository(SourceRepository):
     def list_forms(self, company_id: int) -> list[SourceForm]:
         return [m.map_form(r, company_id) for r in self._query("list_forms", {"company_id": company_id})]
 
+    def list_active_catalog(self, company_id: int, date_from, date_to_exclusive) -> list[tuple[SourceCompany, SourceForm]]:
+        rows = self._query("active_catalog", {
+            "company_id": company_id,
+            "date_from": date_from,
+            "date_to_exclusive": date_to_exclusive,
+        })
+        return [
+            (m.map_company(r), m.map_form(r, r["id_empresa"]))
+            for r in rows
+        ]
+
     def _filter_params(self, filters: ReportFilters) -> dict:
         return {
             "company_id": filters.company_id,

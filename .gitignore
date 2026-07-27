@@ -21,6 +21,7 @@ __pycache__/
 
 # Build artifacts / runtime output
 services/worker/output/
+services/worker/tmp/
 /tmp/tocheck-reports/
 *.log
 

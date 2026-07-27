@@ -19,10 +19,19 @@ def build_source_repository(settings: Settings) -> SourceRepository:
         from .source.postgres_repository import PostgresSourceRepository
 
         return PostgresSourceRepository(settings)
+    if settings.source_adapter in ("snapshot", "neon_snapshot"):
+        from .source.snapshot_repository import SnapshotSourceRepository
+
+        return SnapshotSourceRepository(settings)
     return FixtureSourceRepository(settings.fixtures_dir)
 
 
 def build_storage(settings: Settings) -> Storage:
+    if settings.storage_backend not in ("local", "r2", "s3"):
+        raise ValueError(
+            "STORAGE_BACKEND must be one of: local, r2, s3; "
+            f"received {settings.storage_backend!r}"
+        )
     if settings.storage_backend == "r2":
         from .storage.r2_storage import R2Storage
 
@@ -33,6 +42,14 @@ def build_storage(settings: Settings) -> Storage:
             bucket=settings.r2_bucket,
             endpoint=settings.r2_endpoint,
             region=settings.r2_region,
+        )
+    if settings.storage_backend == "s3":
+        from .storage.s3_storage import S3Storage
+
+        return S3Storage(
+            bucket=settings.s3_bucket,
+            region=settings.s3_region,
+            endpoint=settings.s3_endpoint,
         )
     return LocalStorage(settings.local_storage_dir)
 

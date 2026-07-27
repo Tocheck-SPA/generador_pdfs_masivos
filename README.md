@@ -10,11 +10,18 @@ consulta **solo lectura**.
 
 ---
 
+## Despliegue portable
+
+La UI puede despertar el worker mediante `WORKER_DISPATCH_PROVIDER=disabled`,
+`gcp_cloud_run` o `aws_lambda`. Los artefactos pueden persistirse en `r2` o
+`s3` mediante `STORAGE_BACKEND`, sin cambiar el flujo de generación. El detalle
+de configuración y handoff está en [docs/worker-portability-handoff.md](docs/worker-portability-handoff.md).
+
 ## Arquitectura
 
 ```
 ┌───────────────────────────┐        ┌───────────────────────────┐
-│  Next.js (Vercel)          │        │  Worker Python (Railway)   │
+│  Next.js (Vercel)          │        │  Worker Python (Cloud Run) │
 │  UI · Auth · API rápida    │        │  Fuente → PDF → ZIP → R2   │
 │  conteo · creación de jobs │        │  → correo (Resend)         │
 └─────────────┬──────────────┘        └───────┬───────────┬───────┘
@@ -32,8 +39,8 @@ consulta **solo lectura**.
 - **Neon es la cola persistente** (no Redis/Celery/Kafka). El worker reclama trabajos con
   `SELECT ... FOR UPDATE SKIP LOCKED`.
 - **El progreso se consulta por polling** (2,5 s) desde la UI.
-- **No se copian respuestas a Neon.** Solo metadatos operativos (jobs, ítems, artifacts,
-  eventos, entregas de correo).
+- **Neon conserva el snapshot diario de respuestas necesario para los informes**, además
+  de los metadatos operativos. Las imágenes no se copian: se resuelven desde sus URLs públicas.
 
 ## Estructura del repositorio
 
@@ -97,8 +104,9 @@ DATABASE_URL=postgres://tocheck:tocheck@localhost:5432/tocheck_reportes \
 
 ### 4. Conectar la fuente real (AWS RDS MySQL)
 
-La base de ToCheck es **MySQL en AWS RDS**. El worker trae datos con `SOURCE_ADAPTER=mysql`
-y la convención `RDS_*` (misma que otros proyectos ToCheck). En `services/worker/.env`:
+La base de ToCheck es **MySQL en AWS RDS**. La ingesta local trae datos con `SOURCE_ADAPTER=mysql`
+y la convención `RDS_*`; web y worker productivos leen el snapshot con `SOURCE_ADAPTER=snapshot`.
+En `services/worker/.env` local:
 
 ```
 SOURCE_ADAPTER=mysql
@@ -108,6 +116,9 @@ RDS_USER=readonly_user
 RDS_PASS=...
 RDS_DB=tocheck_prod
 SOURCE_DATABASE_USE_SSL=false
+SOURCE_ASSET_BASE_URL=https://tocheck.s3.amazonaws.com
+SOURCE_LOGO_BASE_URL=https://app.tocheck.cl/public/upload/files/logo_empresa
+TOCHECK_LOGO_URL=https://app.tocheck.cl/public/img_tocheck/logo_negro.png
 STORAGE_BACKEND=local
 EMAIL_BACKEND=console
 ```
@@ -125,7 +136,8 @@ python -m app.main demo --company-id 254 --form-id 100 \
 ```
 
 El adaptador reutiliza las 12 consultas `.sql` traduciendo el dialecto (`= ANY(...)` → `IN ...`).
-Neon (base operativa) y el store de la web siguen siendo PostgreSQL.
+La ingesta reutiliza esas consultas, guarda el snapshot en Neon y el worker productivo ya no
+necesita conexión directa a AWS.
 
 ## Pruebas
 
@@ -151,7 +163,7 @@ Las pruebas del *claim* atómico contra Postgres se activan con `TEST_DATABASE_U
 
 ## Documentación
 
-- [docs/deployment.md](docs/deployment.md) — despliegue paso a paso (Neon, Vercel, Railway, R2, Resend).
+- [docs/deployment.md](docs/deployment.md) — despliegue paso a paso (Neon, Vercel, Cloud Run, R2, Resend).
 - [docs/decisions.md](docs/decisions.md) — decisiones técnicas y consultas SQL implementadas.
 - [docs/pending-fields.md](docs/pending-fields.md) — campos de la fuente por confirmar y puntos de extensión.
 

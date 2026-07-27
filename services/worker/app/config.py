@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     database_url: str = Field(default="", alias="DATABASE_URL")
 
     # Fuente (ToCheck, solo lectura)
-    source_adapter: str = Field(default="fixture", alias="SOURCE_ADAPTER")  # fixture | mysql | postgres
+    source_adapter: str = Field(default="fixture", alias="SOURCE_ADAPTER")  # fixture | mysql | postgres | snapshot
     source_database_url: str = Field(default="", alias="SOURCE_DATABASE_URL")
     source_database_sslmode: str = Field(default="require", alias="SOURCE_DATABASE_SSLMODE")
     source_database_use_ssl: bool = Field(default=False, alias="SOURCE_DATABASE_USE_SSL")
@@ -36,8 +36,21 @@ class Settings(BaseSettings):
     rds_user: str = Field(default="", alias="RDS_USER")
     rds_pass: str = Field(default="", alias="RDS_PASS")
     rds_db: str = Field(default="", alias="RDS_DB")
+    source_company_id: int | None = Field(default=None, alias="SOURCE_COMPANY_ID")
     # Base de imágenes de la fuente (para resolver rutas relativas). Punto de extensión.
-    source_asset_base_url: str = Field(default="", alias="SOURCE_ASSET_BASE_URL")
+    source_asset_base_url: str = Field(
+        default="https://tocheck.s3.amazonaws.com", alias="SOURCE_ASSET_BASE_URL"
+    )
+    # Los logos de empresa se publican en una ruta HTTP distinta a las fotos.
+    source_logo_base_url: str = Field(
+        default="https://app.tocheck.cl/public/upload/files/logo_empresa",
+        alias="SOURCE_LOGO_BASE_URL",
+    )
+    # Logo oficial de ToCheck, independiente del logo de la empresa auditada.
+    tocheck_logo_url: str = Field(
+        default="https://app.tocheck.cl/public/img_tocheck/logo_negro.png",
+        alias="TOCHECK_LOGO_URL",
+    )
     # Directorio local con imágenes por nombre de archivo (fallback offline/pruebas).
     source_asset_local_dir: str = Field(default="", alias="SOURCE_ASSET_LOCAL_DIR")
     fixtures_dir: str = Field(default=str(_REPO_ROOT / "fixtures"), alias="FIXTURES_DIR")
@@ -50,7 +63,7 @@ class Settings(BaseSettings):
     worker_max_attempts: int = Field(default=3, alias="WORKER_MAX_ATTEMPTS")
 
     # Almacenamiento
-    storage_backend: str = Field(default="local", alias="STORAGE_BACKEND")  # local | r2
+    storage_backend: str = Field(default="local", alias="STORAGE_BACKEND")  # local | r2 | s3
     local_storage_dir: str = Field(default=str(_REPO_ROOT / "services" / "worker" / "output"), alias="LOCAL_STORAGE_DIR")
     r2_account_id: str = Field(default="", alias="R2_ACCOUNT_ID")
     r2_access_key_id: str = Field(default="", alias="R2_ACCESS_KEY_ID")
@@ -58,6 +71,10 @@ class Settings(BaseSettings):
     r2_bucket: str = Field(default="", alias="R2_BUCKET")
     r2_endpoint: str = Field(default="", alias="R2_ENDPOINT")
     r2_region: str = Field(default="auto", alias="R2_REGION")
+    s3_bucket: str = Field(default="", alias="AWS_S3_BUCKET")
+    s3_region: str = Field(default="us-east-1", alias="AWS_S3_REGION")
+    s3_prefix: str = Field(default="reports", alias="AWS_S3_PREFIX")
+    s3_endpoint: str = Field(default="", alias="AWS_S3_ENDPOINT")
     report_link_expiration_days: int = Field(default=15, alias="REPORT_LINK_EXPIRATION_DAYS")
     report_retention_days: int = Field(default=90, alias="REPORT_RETENTION_DAYS")
 
@@ -84,6 +101,14 @@ class Settings(BaseSettings):
     @property
     def repo_root(self) -> Path:
         return _REPO_ROOT
+
+    @property
+    def artifact_storage_bucket(self) -> str | None:
+        if self.storage_backend == "r2":
+            return self.r2_bucket or None
+        if self.storage_backend == "s3":
+            return self.s3_bucket or None
+        return None
 
 
 @lru_cache

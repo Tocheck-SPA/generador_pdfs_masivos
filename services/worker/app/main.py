@@ -121,11 +121,89 @@ def _run(max_iterations: int | None = None) -> int:
     return 0
 
 
+def _run_once() -> int:
+    from .jobs.runner import run_worker_once
+
+    settings = get_settings()
+    if not settings.database_url:
+        print("DATABASE_URL no está definida; el modo 'run-once' requiere Neon.")
+        return 1
+    log_context(_log, 20, "worker one-shot iniciado", worker_id=settings.worker_id)
+    try:
+        found = run_worker_once(settings)
+    except Exception as exc:  # noqa: BLE001
+        log_context(_log, 40, "worker one-shot fallido", error_code="UNKNOWN_ERROR",
+                    error_message=str(exc)[:500])
+        return 2
+    log_context(_log, 20, "worker one-shot terminado", job_found=found)
+    return 0
+
+
+def _run_job(job_id: str) -> int:
+    from .jobs.runner import run_worker_job
+
+    settings = get_settings()
+    if not settings.database_url:
+        print("DATABASE_URL no está definida; el modo 'run-job' requiere Neon.")
+        return 1
+    try:
+        found = run_worker_job(settings, job_id)
+    except Exception as exc:  # noqa: BLE001
+        log_context(_log, 40, "worker job fallido", job_id=job_id,
+                    error_code="UNKNOWN_ERROR", error_message=str(exc)[:500])
+        return 2
+    log_context(_log, 20, "worker job terminado", job_id=job_id, job_found=found)
+    return 0
+
+
 def _health() -> int:
     from .database.health import health_report
 
     settings = get_settings()
     print(health_report(settings))
+    return 0
+
+
+def _ingest(company_id: int | None, date_from: str | None,
+            date_to_exclusive: str | None, lookback_days: int) -> int:
+    from .source.ingest import get_last_synced_upper_bound, ingest_snapshot, resolve_ingest_window
+
+    settings = get_settings()
+    if not settings.database_url:
+        print("DATABASE_URL no está definida; la ingesta requiere Neon.")
+        return 1
+    if not settings.rds_host or not settings.rds_db:
+        print("RDS_HOST y RDS_DB deben estar definidos; la ingesta requiere MySQL.")
+        return 1
+    company_id = company_id or settings.source_company_id
+    if company_id is None:
+        print("La ingesta exige --company-id o SOURCE_COMPANY_ID; no se permite cargar todas las empresas.")
+        return 1
+
+    parsed_from = datetime.fromisoformat(date_from) if date_from else None
+    parsed_to = datetime.fromisoformat(date_to_exclusive) if date_to_exclusive else None
+    # Ingesta incremental real: si no se pasa --date-from, se continúa desde el
+    # instante exacto (fecha+hora) donde terminó la última corrida completada,
+    # no desde la medianoche del día. Así no se pierden ni repiten respuestas
+    # que aparezcan más tarde el mismo día.
+    last_upper_bound = None
+    if parsed_from is None:
+        last_upper_bound = get_last_synced_upper_bound(settings, company_id)
+    start, end = resolve_ingest_window(
+        date_from=parsed_from, date_to_exclusive=parsed_to,
+        last_synced_upper_bound=last_upper_bound, lookback_days=lookback_days,
+        now=datetime.now(),
+    )
+    origin = "explícito" if parsed_from else ("último sync" if last_upper_bound else f"lookback {lookback_days}d")
+    print(f"Ingestando fuente MySQL ({origin}): {start.isoformat()} -> {end.isoformat()}")
+    try:
+        result = ingest_snapshot(settings, company_id=company_id, date_from=start,
+                                 date_to_exclusive=end)
+    except Exception as exc:  # noqa: BLE001
+        print(f"Ingesta fallida: {exc}")
+        return 2
+    print(f"Ingesta completa para empresa {company_id}: "
+          f"{result['responses_upserted']} respuestas actualizadas en Neon.")
     return 0
 
 
@@ -156,7 +234,16 @@ def main(argv: list[str] | None = None) -> int:
     run_p = sub.add_parser("run", help="Loop de worker sobre Neon")
     run_p.add_argument("--max-iterations", type=int, default=None,
                        help="Nº de ciclos de poll antes de salir (para pruebas controladas).")
+    sub.add_parser("run-once", help="Reclama y procesa como máximo un job; termina al finalizar.")
+    run_job = sub.add_parser("run-job", help="Procesa exactamente un job por UUID.")
+    run_job.add_argument("--job-id", required=True)
     sub.add_parser("health", help="Estado de dependencias")
+
+    ingest = sub.add_parser("ingest", help="Copia una ventana de MySQL a Neon")
+    ingest.add_argument("--company-id", type=int, default=None)
+    ingest.add_argument("--date-from", default=None)
+    ingest.add_argument("--date-to-exclusive", default=None)
+    ingest.add_argument("--lookback-days", type=int, default=7)
 
     args = parser.parse_args(argv)
     if args.command == "demo":
@@ -166,8 +253,14 @@ def main(argv: list[str] | None = None) -> int:
         return _catalog(args.company_id, args.form_id, args.date_from, args.date_to_exclusive)
     if args.command == "run":
         return _run(args.max_iterations)
+    if args.command == "run-once":
+        return _run_once()
+    if args.command == "run-job":
+        return _run_job(args.job_id)
     if args.command == "health":
         return _health()
+    if args.command == "ingest":
+        return _ingest(args.company_id, args.date_from, args.date_to_exclusive, args.lookback_days)
     return 1
 
 

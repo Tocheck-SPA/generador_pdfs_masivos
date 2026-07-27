@@ -11,6 +11,8 @@ class StoredObject:
     size_bytes: int
     content_type: str
     checksum: str
+    storage_provider: str = "local"
+    storage_bucket: str | None = None
 
 
 class Storage(ABC):

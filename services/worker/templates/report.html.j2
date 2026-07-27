@@ -2,7 +2,6 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-{% set TOCHECK_LOGO %}data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB4PSI1IiB5PSI1IiB3aWR0aD0iOTAiIGhlaWdodD0iOTAiIHJ4PSIzMCIgZmlsbD0iIzE1MTUxNSIvPjxwYXRoIGQ9Ik0zMiAzNiBoMzYgYTggOCAwIDAgMSAwIDE2IGgtMTAgdjIwIGEgOCA4IDAgMCAxIC0xNiAwIHYtMjAgaC0xMCBhIDggOCAwIDAgMSAwIC0xNiB6IiBmaWxsPSIjZmZmIi8+PC9zdmc+{% endset %}
 <style>
   :root{
     --primary:#2F6EE8; --heading:#1f2430; --text:#374151; --muted:#6b7280; --soft:#9ca3af;
@@ -33,8 +32,9 @@
     display:flex;text-align:center;padding:18px 10px;margin:8px 0 22px;}
   .band > div{flex:1;}
 
-  .pe-box{background:var(--surface-muted);border:1px solid var(--border);border-radius:14px;
-    text-align:center;padding:16px;margin:0 0 26px;}
+  .loc-row{display:flex;gap:16px;margin:0 0 26px;}
+  .pe-box{flex:1;background:var(--surface-muted);border:1px solid var(--border);border-radius:14px;
+    text-align:center;padding:16px;}
   .pe-box .lbl{margin-bottom:4px;}
   .pe-box .val{font-size:16px;}
 
@@ -124,7 +124,7 @@
       <h1>{{ r.form.name or 'Checklist' }}</h1>
       <div class="powered">Powered by Tocheck</div>
     </div>
-    <div class="logo tc"><img src="{{ TOCHECK_LOGO }}" alt="ToCheck"></div>
+    <div class="logo tc"><img src="{{ tocheck_logo_url }}" alt="ToCheck"></div>
   </div>
 
   <div class="two-col">
@@ -138,10 +138,13 @@
     <div><div class="lbl">Duración</div><div class="val">{{ r.duration or '—' }}</div></div>
   </div>
 
-  {% if r.evaluation_point %}
-  <div class="pe-box"><div class="lbl">Punto de Evaluación:</div><div class="val">{{ r.evaluation_point.name or '—' }}</div></div>
-  {% elif r.auditable_entity %}
-  <div class="pe-box"><div class="lbl">Entidad auditable:</div><div class="val">{{ r.auditable_entity.name or '—' }}</div></div>
+  {% set has_pe = r.evaluation_point and r.evaluation_point.name %}
+  {% set has_ent = r.auditable_entity and r.auditable_entity.name %}
+  {% if has_pe or has_ent %}
+  <div class="loc-row">
+    {% if has_pe %}<div class="pe-box"><div class="lbl">Punto de Evaluación:</div><div class="val">{{ r.evaluation_point.name }}</div></div>{% endif %}
+    {% if has_ent %}<div class="pe-box"><div class="lbl">Entidad Auditable:</div><div class="val">{{ r.auditable_entity.name }}</div></div>{% endif %}
+  </div>
   {% endif %}
 
   <div class="score-box">
@@ -241,7 +244,7 @@
   {% for sig in r.signatures %}
   <div class="card">
     <div class="sign">
-      <div class="ava"><img src="{{ TOCHECK_LOGO }}" alt=""></div>
+      <div class="ava"><img src="{{ tocheck_logo_url }}" alt=""></div>
       <div>
         <div class="h">{% if sig.signed_at %}Firma{% else %}Firma Pendiente:{% endif %}</div>
         <div class="row"><b>Nombre:</b> {{ sig.signer_name or '' }} {{ sig.signer_last_name or '' }}</div>
@@ -256,7 +259,7 @@
 {% endif %}
 
 <div class="footer">
-  <div class="pw">Powered by <img src="{{ TOCHECK_LOGO }}" alt="ToCheck"></div>
+  <div class="pw">Powered by <img src="{{ tocheck_logo_url }}" alt="ToCheck"></div>
   <div style="font-size:10px;color:var(--soft);margin-top:6px;">Informe N.º {{ r.response_id }}</div>
 </div>
 

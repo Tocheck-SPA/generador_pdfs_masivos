@@ -6,6 +6,7 @@ import type {
   SourceEvaluationPoint,
   SourceFilters,
   SourceForm,
+  SourceSnapshotStatus,
 } from "@/lib/types";
 import type { SourceReader } from "./types";
 
@@ -47,6 +48,16 @@ async function query(sql: string, params: unknown[]): Promise<Row[]> {
 }
 
 export class MysqlSource implements SourceReader {
+  async getSnapshotStatus(): Promise<SourceSnapshotStatus> {
+    return {
+      isSnapshot: false,
+      lastSuccessfulSyncAt: null,
+      coveredFrom: null,
+      coveredToExclusive: null,
+      isCovered: true,
+    };
+  }
+
   async listCompanies(): Promise<SourceCompany[]> {
     const rows = await query(
       `SELECT DISTINCT e.id AS id, e.empresa AS name, e.logo AS logo

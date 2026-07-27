@@ -27,12 +27,19 @@ def _to_data_uri(raw: bytes, max_dimension: int, jpeg_quality: int) -> str:
     return f"data:image/jpeg;base64,{encoded}"
 
 
-def _resolve_logo(raw: str | None, repository: SourceRepository) -> str | None:
+def _resolve_logo(
+    raw: str | None,
+    repository: SourceRepository,
+    logo_base_url: str | None = None,
+) -> str | None:
     """Convierte una ruta de logo en data URI; None si no se puede resolver."""
     if not raw or raw.startswith("data:"):
         return raw
     try:
-        asset = repository.resolve_asset(raw)
+        source_path = raw
+        if logo_base_url and not raw.startswith(("http://", "https://")):
+            source_path = logo_base_url.rstrip("/") + "/" + raw.lstrip("/")
+        asset = repository.resolve_asset(source_path)
         if asset.found and asset.content:
             return _to_data_uri(asset.content, 400, 90)
     except (UnidentifiedImageError, OSError, ValueError):
@@ -46,10 +53,11 @@ def resolve_report_images(
     *,
     max_dimension: int = 1600,
     jpeg_quality: int = 80,
+    logo_base_url: str | None = None,
 ) -> None:
     """Rellena `data_uri` de cada imagen in-place. Procesa una imagen a la vez."""
-    data.company.logo = _resolve_logo(data.company.logo, repository)
-    data.form.logo = _resolve_logo(data.form.logo, repository)
+    data.company.logo = _resolve_logo(data.company.logo, repository, logo_base_url)
+    data.form.logo = _resolve_logo(data.form.logo, repository, logo_base_url)
     for section in data.sections:
         for question in section.questions:
             resolved: list[ReportImage] = []

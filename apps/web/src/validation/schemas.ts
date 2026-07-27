@@ -19,6 +19,12 @@ export const evaluationPointsQuerySchema = z.object({
   dateTo: dateOnly,
 });
 
+export const snapshotStatusQuerySchema = z.object({
+  companyId: idFromQuery,
+  dateFrom: dateOnly,
+  dateTo: dateOnly,
+});
+
 export const countBodySchema = z.object({
   companyId: z.number().int().positive(),
   formId: z.number().int().positive(),

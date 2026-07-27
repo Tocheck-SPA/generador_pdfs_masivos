@@ -5,6 +5,7 @@ import type {
   SourceEvaluationPoint,
   SourceFilters,
   SourceForm,
+  SourceSnapshotStatus,
 } from "@/lib/types";
 
 export interface SourceReader {
@@ -15,4 +16,9 @@ export interface SourceReader {
   ): Promise<SourceEvaluationPoint[]>;
   countResponses(filters: SourceFilters): Promise<CountResult>;
   listResponseIds(filters: SourceFilters): Promise<ResponseRef[]>;
+  getSnapshotStatus(
+    companyId: number,
+    dateFrom: string,
+    dateToExclusive: string
+  ): Promise<SourceSnapshotStatus>;
 }

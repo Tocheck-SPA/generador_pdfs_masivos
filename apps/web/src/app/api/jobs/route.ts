@@ -9,6 +9,7 @@ import {
   MAX_RESPONSES_PER_JOB,
 } from "@/lib/constants";
 import { jsonError, requireSession, zodMessage } from "@/server/api-helpers";
+import { dispatchWorkerJob } from "@/server/dispatch";
 
 export const runtime = "nodejs";
 
@@ -101,6 +102,15 @@ export async function POST(request: Request) {
       createdByEmail: gate.session.email,
       responseRefs,
     });
+    try {
+      await dispatchWorkerJob({ jobId: result.jobId, request });
+    } catch (dispatchError) {
+      console.error("No se pudo despertar el worker", dispatchError);
+      return jsonError(
+        `Trabajo creado (${result.jobId}), pero no se pudo iniciar el procesador`,
+        502,
+      );
+    }
     return NextResponse.json(result, { status: 201 });
   } catch {
     return jsonError("No se pudo crear el trabajo", 500);

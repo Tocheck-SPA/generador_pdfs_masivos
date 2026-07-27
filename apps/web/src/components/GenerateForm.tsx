@@ -7,6 +7,7 @@ import type {
   SourceCompany,
   SourceEvaluationPoint,
   SourceForm,
+  SourceSnapshotStatus,
 } from "@/lib/types";
 import { defaultDateRange } from "@/lib/dates";
 import { MAX_RECIPIENTS_PER_JOB } from "@/lib/constants";
@@ -41,6 +42,8 @@ export default function GenerateForm({
 
   const [count, setCount] = useState<CountResult | null>(null);
   const [countLoading, setCountLoading] = useState(false);
+  const [snapshotStatus, setSnapshotStatus] = useState<SourceSnapshotStatus | null>(null);
+  const [snapshotStatusLoading, setSnapshotStatusLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -82,6 +85,35 @@ export default function GenerateForm({
       })
       .catch(() => setPoints([]));
   }, [companyId, formId, dateFrom, dateTo]);
+
+  // En modo snapshot, verifica que una ingesta completada cubra todo el rango.
+  useEffect(() => {
+    if (companyId === null || dateFrom > dateTo) {
+      setSnapshotStatus(null);
+      setSnapshotStatusLoading(false);
+      return;
+    }
+    const qs = new URLSearchParams({
+      companyId: String(companyId),
+      dateFrom,
+      dateTo,
+    });
+    let active = true;
+    setSnapshotStatusLoading(true);
+    getJson<SourceSnapshotStatus>(`/api/source/status?${qs}`)
+      .then((data) => {
+        if (active) setSnapshotStatus(data);
+      })
+      .catch(() => {
+        if (active) setSnapshotStatus(null);
+      })
+      .finally(() => {
+        if (active) setSnapshotStatusLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [companyId, dateFrom, dateTo]);
 
   const effectivePointIds = useMemo(
     () => (allPoints ? [] : selectedPoints),
@@ -155,6 +187,8 @@ export default function GenerateForm({
   const hasInvalidRecipient = recipients.some((e) => !isValidEmail(e));
   const pointsValid = allPoints || selectedPoints.length > 0;
   const hasCount = count !== null && count.totalResponses > 0;
+  const snapshotUnavailable =
+    snapshotStatus?.isSnapshot === true && !snapshotStatus.isCovered;
 
   const formValid =
     companyId !== null &&
@@ -164,7 +198,24 @@ export default function GenerateForm({
     validRecipients.length > 0 &&
     !hasInvalidRecipient &&
     hasCount &&
+    !snapshotStatusLoading &&
+    !snapshotUnavailable &&
     !submitting;
+
+  function formatSnapshotDate(value: string | null): string {
+    if (!value) return "sin registro";
+    return new Intl.DateTimeFormat("es-CL", {
+      timeZone: "America/Santiago",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+      .format(new Date(value))
+      .replace(", ", " ");
+  }
 
   async function handleSubmit(): Promise<void> {
     setFormError(null);
@@ -287,6 +338,19 @@ export default function GenerateForm({
         </div>
         {errors.dates && <p className="field-error">{errors.dates}</p>}
       </div>
+
+      {snapshotStatus?.isSnapshot && (
+        <div className={`snapshot-status ${snapshotUnavailable ? "uncovered" : "covered"}`}>
+          <p className="snapshot-last-update">
+            Última actualización de datos: {formatSnapshotDate(snapshotStatus.lastSuccessfulSyncAt)}
+          </p>
+          {snapshotUnavailable && (
+            <p className="snapshot-warning">
+              No hay snapshot disponible para este período. Solicita o ejecuta una nueva ingesta.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Puntos de evaluación */}
       <div className="field">

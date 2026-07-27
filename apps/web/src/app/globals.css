@@ -434,6 +434,28 @@ select.form-control {
   color: var(--color-error);
 }
 
+.snapshot-status {
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: -4px 0 20px;
+  font-size: 0.9em;
+}
+.snapshot-status.covered {
+  background: #f0fdf4;
+  color: #166534;
+}
+.snapshot-status.uncovered {
+  background: #fff7ed;
+  color: #9a3412;
+}
+.snapshot-status p {
+  margin: 0;
+}
+.snapshot-warning {
+  margin-top: 4px !important;
+  font-weight: 600;
+}
+
 .center-card {
   max-width: 720px;
   margin: 0 auto;

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
+import { presignArtifact } from "@/server/artifactStorage";
 import type { CreateJobInput, DeliveryMode, JobSummary } from "@/lib/types";
 import type { JobStatus } from "@/lib/status";
 import type { CreateJobResult, JobStore } from "./types";
@@ -198,13 +199,23 @@ export class PgStore implements JobStore {
 
   async getDownloadUrl(jobId: string): Promise<string | null> {
     const pool = getPool();
-    const res = await pool.query<{ storage_key: string }>(
-      `SELECT storage_key FROM report_artifacts
+    const res = await pool.query<{
+      storage_key: string;
+      storage_provider: string | null;
+      storage_bucket: string | null;
+    }>(
+      `SELECT storage_key, storage_provider, storage_bucket FROM report_artifacts
         WHERE job_id = $1 AND artifact_type = 'zip'
         ORDER BY created_at DESC LIMIT 1`,
       [jobId]
     );
-    return res.rows[0]?.storage_key ?? null;
+    const artifact = res.rows[0];
+    if (!artifact) return null;
+    return presignArtifact({
+      provider: artifact.storage_provider,
+      bucket: artifact.storage_bucket,
+      key: artifact.storage_key,
+    });
   }
 
   async upsertUser(email: string, name: string | null): Promise<void> {

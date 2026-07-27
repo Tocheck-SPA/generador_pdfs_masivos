@@ -32,10 +32,27 @@ def test_slugify_strips_accents_and_spaces():
     assert slugify("Sucursal Providencia Ñuñoa") == "sucursal_providencia_nunoa"
 
 
-def test_pdf_filename_format():
-    name = pdf_filename(datetime(2026, 7, 22), "Tarragona Retail", "Providencia", "Preventiva", 128483)
+def test_pdf_filename_point_only():
+    name = pdf_filename(datetime(2026, 7, 22), "Tarragona Retail", "Providencia", None, "Preventiva", 128483)
     assert name == "2026-07-22_tarragona_retail_providencia_preventiva_128483.pdf"
     assert name.endswith("_128483.pdf")
+
+
+def test_pdf_filename_with_entity():
+    name = pdf_filename(datetime(2026, 7, 4), "BeLive", "Movistar Arena",
+                        "FRANK COMPLETERIA-FM11", "BPM Foodtruck 1.1", 446748)
+    assert name == "2026-07-04_belive_movistar_arena_frank_completeria_fm11_bpm_foodtruck_1_1_446748.pdf"
+
+
+def test_pdf_filename_entity_only():
+    name = pdf_filename(datetime(2026, 7, 4), "BeLive", None, "Camión ABCD-12", "Auditoría", 500)
+    assert name == "2026-07-04_belive_camion_abcd_12_auditoria_500.pdf"
+
+
+def test_pdf_filename_neither_point_nor_entity():
+    # Sin punto ni entidad: no se agregan segmentos vacíos.
+    name = pdf_filename(datetime(2026, 7, 4), "BeLive", None, None, "Auditoría", 500)
+    assert name == "2026-07-04_belive_auditoria_500.pdf"
 
 
 def test_zip_filename():

@@ -79,7 +79,8 @@ def _storage_prefix(settings: Settings, ctx: JobContext) -> str:
     slug = slugify(ctx.company_name, "empresa")
     year = ctx.filters.date_from.strftime("%Y")
     month = ctx.filters.date_from.strftime("%m")
-    return f"reports/{slug}/{year}/{month}/{ctx.job_id}"
+    root = settings.s3_prefix.strip("/") if settings.storage_backend == "s3" else "reports"
+    return f"{root}/{slug}/{year}/{month}/{ctx.job_id}"
 
 
 def process_job(
@@ -107,7 +108,10 @@ def process_job(
 
     report("fetching_source_data", 0, 0, 0)
 
-    with PdfRenderer(render_timeout_seconds=settings.pdf_render_timeout_seconds) as renderer:
+    with PdfRenderer(
+        render_timeout_seconds=settings.pdf_render_timeout_seconds,
+        tocheck_logo_url=settings.tocheck_logo_url,
+    ) as renderer:
         report("generating_pdfs", 0, 0, 0)
         for batch in _chunks(ctx.response_ids, settings.source_query_batch_size):
             if is_cancelled and is_cancelled():
@@ -148,7 +152,9 @@ def process_job(
                     payload_hash = source_payload_hash(data)
                     filename = pdf_filename(
                         data.completed_at, data.company.name,
-                        _point_label(data), data.form.name, response_id,
+                        data.evaluation_point.name if data.evaluation_point else None,
+                        data.auditable_entity.name if data.auditable_entity else None,
+                        data.form.name, response_id,
                     )
                     key = f"{prefix}/individual/{filename}"
 
@@ -240,6 +246,7 @@ def _get_or_render(data, response_id, payload_hash, key, filename, *,
     resolve_report_images(
         data, repository,
         max_dimension=settings.pdf_image_max_dimension, jpeg_quality=settings.pdf_jpeg_quality,
+        logo_base_url=settings.source_logo_base_url,
     )
     pdf_bytes = renderer.render_pdf(data)
     storage.put(key, pdf_bytes, "application/pdf")

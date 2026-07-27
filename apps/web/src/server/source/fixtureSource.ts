@@ -8,6 +8,7 @@ import type {
   SourceEvaluationPoint,
   SourceFilters,
   SourceForm,
+  SourceSnapshotStatus,
 } from "@/lib/types";
 import type { SourceReader } from "./types";
 
@@ -74,6 +75,16 @@ function before(completedAt: string, dateToExclusive: string): boolean {
 
 export class FixtureSource implements SourceReader {
   private dir = resolveFixturesDir();
+
+  async getSnapshotStatus(): Promise<SourceSnapshotStatus> {
+    return {
+      isSnapshot: false,
+      lastSuccessfulSyncAt: null,
+      coveredFrom: null,
+      coveredToExclusive: null,
+      isCovered: true,
+    };
+  }
 
   private async companies(): Promise<RawCompany[]> {
     return loadJson<RawCompany[]>(this.dir, "companies.json");

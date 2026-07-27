@@ -24,6 +24,7 @@ class LocalStorage(Storage):
             size_bytes=len(content),
             content_type=content_type,
             checksum=hashlib.sha256(content).hexdigest(),
+            storage_provider="local",
         )
 
     def presigned_url(self, key: str, expires_seconds: int) -> str:

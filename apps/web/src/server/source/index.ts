@@ -10,7 +10,7 @@ export function getSource(): SourceReader {
   const adapter = process.env.SOURCE_ADAPTER;
   if (adapter === "mysql") {
     instance = new MysqlSource();
-  } else if (adapter === "postgres") {
+  } else if (adapter === "postgres" || adapter === "snapshot" || adapter === "neon_snapshot") {
     instance = new PostgresSource();
   } else {
     instance = new FixtureSource();

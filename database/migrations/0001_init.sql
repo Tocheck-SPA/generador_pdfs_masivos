@@ -98,6 +98,8 @@ CREATE TABLE IF NOT EXISTS report_artifacts (
     artifact_type       TEXT NOT NULL,          -- pdf | zip | manifest | consolidated_pdf
     filename            TEXT NOT NULL,
     storage_key         TEXT NOT NULL,
+    storage_provider    TEXT NOT NULL DEFAULT 'r2',
+    storage_bucket      TEXT,
     content_type        TEXT,
     size_bytes          BIGINT,
     checksum            TEXT,

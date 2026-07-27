@@ -34,7 +34,56 @@ def run_worker_loop(settings: Settings, *, max_iterations: int | None = None) ->
         conn.close()
 
 
-def _process_claimed(conn, job, *, repo, storage, email_sender, settings: Settings) -> None:
+def run_worker_once(settings: Settings) -> bool:
+    """Reclama y procesa como máximo un job; devuelve si encontró trabajo."""
+    repo = build_source_repository(settings)
+    storage = build_storage(settings)
+    email_sender = build_email_sender(settings)
+    conn = connect(settings.database_url)
+    try:
+        job = jdb.claim_next_job(conn, worker_id=settings.worker_id,
+                                 stale_seconds=settings.worker_stale_after_seconds)
+        if job is None:
+            return False
+        _process_claimed(conn, job, repo=repo, storage=storage,
+                         email_sender=email_sender, settings=settings, propagate=True)
+        return True
+    finally:
+        conn.close()
+
+
+def run_worker_job(settings: Settings, job_id: str, *, worker_id: str | None = None) -> bool:
+    """Claim and process exactly the requested job."""
+    runtime_settings = settings.model_copy(update={"worker_id": worker_id}) if worker_id else settings
+    repo = build_source_repository(runtime_settings)
+    storage = build_storage(runtime_settings)
+    email_sender = build_email_sender(runtime_settings)
+    conn = connect(runtime_settings.database_url)
+    try:
+        job = jdb.claim_job_by_id(
+            conn,
+            job_id,
+            worker_id=runtime_settings.worker_id,
+            stale_seconds=runtime_settings.worker_stale_after_seconds,
+        )
+        if job is None:
+            return False
+        _process_claimed(
+            conn,
+            job,
+            repo=repo,
+            storage=storage,
+            email_sender=email_sender,
+            settings=runtime_settings,
+            propagate=True,
+        )
+        return True
+    finally:
+        conn.close()
+
+
+def _process_claimed(conn, job, *, repo, storage, email_sender, settings: Settings,
+                     propagate: bool = False) -> None:
     job_id = str(job["id"])
     log_context(_log, 20, "job reclamado", job_id=job_id, worker_id=settings.worker_id,
                 attempt=job["attempt_count"])
@@ -80,6 +129,8 @@ def _process_claimed(conn, job, *, repo, storage, email_sender, settings: Settin
         log_context(_log, 40, "fallo de job", job_id=job_id, error_code="UNKNOWN_ERROR")
         jdb.record_event(conn, job_id, level="error", event_type="job_failed", message=str(exc)[:500])
         jdb.release_failed_attempt(conn, job_id, error_code="UNKNOWN_ERROR", error_message=str(exc)[:500])
+        if propagate:
+            raise
 
 
 def _persist_outcome(conn, job_id, outcome, ctx: JobContext, settings: Settings, email_idem: str) -> None:
@@ -97,6 +148,8 @@ def _persist_outcome(conn, job_id, outcome, ctx: JobContext, settings: Settings,
             jdb.record_artifact(
                 conn, job_id, artifact_type="pdf", filename=item.filename, storage_key=item.pdf_key,
                 content_type="application/pdf", size_bytes=0, checksum="",
+                storage_provider=settings.storage_backend,
+                storage_bucket=settings.artifact_storage_bucket,
                 source_response_id=item.response_id, source_payload_hash=item.payload_hash,
                 template_version=settings.pdf_template_version, generator_version=settings.pdf_generator_version,
                 expires_at=expires,
@@ -105,11 +158,17 @@ def _persist_outcome(conn, job_id, outcome, ctx: JobContext, settings: Settings,
     if outcome.zip_key and outcome.zip_filename:
         jdb.record_artifact(conn, job_id, artifact_type="zip", filename=outcome.zip_filename,
                             storage_key=outcome.zip_key, content_type="application/zip",
-                            size_bytes=0, checksum="", expires_at=expires)
+                            size_bytes=0, checksum="",
+                            storage_provider=settings.storage_backend,
+                            storage_bucket=settings.artifact_storage_bucket,
+                            expires_at=expires)
     if outcome.manifest_key:
         jdb.record_artifact(conn, job_id, artifact_type="manifest", filename="manifest.csv",
                             storage_key=outcome.manifest_key, content_type="text/csv",
-                            size_bytes=0, checksum="", expires_at=expires)
+                            size_bytes=0, checksum="",
+                            storage_provider=settings.storage_backend,
+                            storage_bucket=settings.artifact_storage_bucket,
+                            expires_at=expires)
 
     if outcome.email_result is not None:
         jdb.mark_email_result(conn, email_idem, provider=outcome.email_result.provider,

@@ -67,6 +67,23 @@ def claim_next_job(conn: psycopg.Connection, *, worker_id: str, stale_seconds: i
     return row
 
 
+def claim_job_by_id(conn: psycopg.Connection, job_id: str, *, worker_id: str,
+                    stale_seconds: int) -> dict | None:
+    """Claim exactly one requested job, preserving the queue safety rules."""
+    sql = _CLAIM_SQL.replace(
+        "    WHERE attempt_count < max_attempts",
+        "    WHERE id = %(job_id)s\n      AND attempt_count < max_attempts",
+    )
+    with conn.cursor() as cur:
+        cur.execute(sql, {
+            "job_id": job_id, "worker_id": worker_id, "stale_seconds": stale_seconds,
+            "active": list(_ACTIVE_STATES), "terminal": list(_TERMINAL_STATES),
+        })
+        row = cur.fetchone()
+    conn.commit()
+    return row
+
+
 def load_job_payload(conn: psycopg.Connection, job_id: str) -> dict:
     with conn.cursor() as cur:
         cur.execute("SELECT * FROM report_jobs WHERE id = %s", (job_id,))
@@ -144,17 +161,20 @@ def record_item(conn: psycopg.Connection, job_id: str, response_id: int, *, stat
 
 def record_artifact(conn: psycopg.Connection, job_id: str, *, artifact_type: str, filename: str,
                     storage_key: str, content_type: str, size_bytes: int, checksum: str,
+                    storage_provider: str = "r2", storage_bucket: str | None = None,
                     source_response_id: int | None = None, source_payload_hash: str | None = None,
                     template_version: str | None = None, generator_version: str | None = None,
                     expires_at: datetime | None = None) -> str:
     with conn.cursor() as cur:
         cur.execute(
             """INSERT INTO report_artifacts
-               (job_id, source_response_id, artifact_type, filename, storage_key, content_type,
-                size_bytes, checksum, source_payload_hash, template_version, generator_version, expires_at)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
-            (job_id, source_response_id, artifact_type, filename, storage_key, content_type,
-             size_bytes, checksum, source_payload_hash, template_version, generator_version, expires_at),
+               (job_id, source_response_id, artifact_type, filename, storage_key,
+                storage_provider, storage_bucket, content_type, size_bytes, checksum,
+                source_payload_hash, template_version, generator_version, expires_at)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+            (job_id, source_response_id, artifact_type, filename, storage_key,
+             storage_provider, storage_bucket, content_type, size_bytes, checksum,
+             source_payload_hash, template_version, generator_version, expires_at),
         )
         artifact_id = cur.fetchone()["id"]
     conn.commit()

@@ -17,4 +17,5 @@ COPY templates ./templates
 ENV FIXTURES_DIR=/fixtures
 
 ENV PYTHONUNBUFFERED=1
-CMD ["python", "-m", "app.main", "run"]
+ENTRYPOINT ["python", "-m", "app.main"]
+CMD ["run-once"]

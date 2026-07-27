@@ -1,7 +1,9 @@
 """Generación de nombres de archivo seguros.
 
-Formato: YYYY-MM-DD_empresa_punto_formulario_response-id.pdf
+Formato: YYYY-MM-DD_empresa_[punto]_[entidad]_formulario_response-id.pdf
 minúsculas, sin tildes, espacios -> guion bajo, sin caracteres inválidos.
+El punto de evaluación y la entidad auditable solo se incluyen si existen;
+cuando faltan no se agrega ningún segmento vacío.
 """
 from __future__ import annotations
 
@@ -25,18 +27,19 @@ def slugify(value: str | None, fallback: str = "sd") -> str:
 def pdf_filename(
     completed_at: datetime,
     company_name: str | None,
-    point_or_entity: str | None,
+    point_name: str | None,
+    entity_name: str | None,
     form_name: str | None,
     response_id: int,
 ) -> str:
-    date_part = completed_at.strftime("%Y-%m-%d")
-    parts = [
-        date_part,
-        slugify(company_name, "empresa"),
-        slugify(point_or_entity, "punto"),
-        slugify(form_name, "formulario"),
-        str(response_id),
-    ]
+    parts = [completed_at.strftime("%Y-%m-%d"), slugify(company_name, "empresa")]
+    # Punto y entidad son opcionales: solo se agregan si tienen contenido real.
+    if point_name and point_name.strip():
+        parts.append(slugify(point_name))
+    if entity_name and entity_name.strip():
+        parts.append(slugify(entity_name))
+    parts.append(slugify(form_name, "formulario"))
+    parts.append(str(response_id))
     return "_".join(parts) + ".pdf"
 
 

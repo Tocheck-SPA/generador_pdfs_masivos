@@ -1,0 +1,17 @@
+# Lambda runtime for the same Playwright worker core.
+FROM mcr.microsoft.com/playwright/python:v1.48.0-jammy
+
+WORKDIR /app
+
+COPY requirements-lambda.txt ./
+RUN pip install --no-cache-dir -r requirements-lambda.txt \
+    && python -m playwright install chromium
+
+COPY app ./app
+COPY templates ./templates
+
+ENV FIXTURES_DIR=/fixtures
+ENV PYTHONUNBUFFERED=1
+
+ENTRYPOINT ["python", "-m", "awslambdaric"]
+CMD ["app.lambda_handler.handler"]
