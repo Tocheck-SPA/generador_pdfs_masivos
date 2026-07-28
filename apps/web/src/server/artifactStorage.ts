@@ -42,7 +42,14 @@ export async function presignArtifact(location: ArtifactLocation): Promise<strin
         process.env.WORKER_AWS_REGION ||
         process.env.AWS_REGION ||
         "us-east-1",
-      ...(roleArn ? { credentials: awsCredentialsProvider({ roleArn }) } : {}),
+      ...(roleArn
+        ? {
+            credentials: awsCredentialsProvider({
+              roleArn,
+              audience: "sts.amazonaws.com",
+            }),
+          }
+        : {}),
     });
     return getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: location.key }), {
       expiresIn: Number(process.env.REPORT_LINK_EXPIRATION_SECONDS || 1_296_000),

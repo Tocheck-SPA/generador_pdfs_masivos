@@ -11,8 +11,20 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# services/worker/app/config.py -> repo root son 3 niveles hacia arriba.
-_REPO_ROOT = Path(__file__).resolve().parents[3]
+
+def _resolve_repo_root() -> Path:
+    """Raíz del monorepo en local; en Lambda Docker el código vive en /app/app."""
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        if (parent / "fixtures").is_dir() and (
+            (parent / "apps").is_dir() or (parent / "services").is_dir()
+        ):
+            return parent
+    # Imagen Lambda/Cloud Run: WORKDIR /app, paquete en /app/app
+    return here.parents[1] if len(here.parents) > 1 else here.parent
+
+
+_REPO_ROOT = _resolve_repo_root()
 
 
 class Settings(BaseSettings):

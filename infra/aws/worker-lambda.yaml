@@ -346,10 +346,12 @@ Resources:
       Url: !Sub https://oidc.vercel.com/${VercelTeamSlug}
       ClientIdList:
         - !Sub https://vercel.com/${VercelTeamSlug}
+        # @vercel/oidc-aws-credentials-provider usa aud=sts.amazonaws.com
+        - sts.amazonaws.com
       ThumbprintList:
-        # AWS exige al menos un thumbprint; con OIDC moderno la validación
-        # principal es por el certificado de la URL del issuer.
-        - 9e99a48a9960b14926bb7f3b02e22da2b0ab7280
+        # Certificados TLS de oidc.vercel.com (no usar thumbprints de GitHub).
+        - 91d89f33169baa11a2e810804f8d25f5639aa440
+        - 2d74d6dfd96eea55ad7baafa0d3c6552b2dadc37
 
   VercelInvokeRole:
     Type: AWS::IAM::Role
@@ -367,10 +369,13 @@ Resources:
                 "Action": "sts:AssumeRoleWithWebIdentity",
                 "Condition": {
                   "StringEquals": {
-                    "oidc.vercel.com/${VercelTeamSlug}:aud": "https://vercel.com/${VercelTeamSlug}"
+                    "oidc.vercel.com/${VercelTeamSlug}:aud": [
+                      "sts.amazonaws.com",
+                      "https://vercel.com/${VercelTeamSlug}"
+                    ]
                   },
                   "StringLike": {
-                    "oidc.vercel.com/${VercelTeamSlug}:sub": "owner:${VercelTeamSlug}:project:${VercelProjectName}:environment:${VercelEnvironment}"
+                    "oidc.vercel.com/${VercelTeamSlug}:sub": "owner:${VercelTeamSlug}:project:${VercelProjectName}:environment:*"
                   }
                 }
               }

@@ -11,7 +11,13 @@ function getClient(): LambdaClient {
   client = new LambdaClient({
     region: required("WORKER_AWS_REGION", "AWS_REGION"),
     ...(roleArn
-      ? { credentials: awsCredentialsProvider({ roleArn }) }
+      ? {
+          credentials: awsCredentialsProvider({
+            roleArn,
+            // Vercel docs (2026): aud por defecto de STS para federation AWS.
+            audience: "sts.amazonaws.com",
+          }),
+        }
       : {}),
   });
   return client;
