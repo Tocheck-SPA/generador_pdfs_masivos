@@ -92,7 +92,19 @@ AWS_S3_BUCKET=...
 AWS_S3_REGION=sa-east-1
 ```
 
-El mismo `AWS_ROLE_ARN` sirve para invocar Lambda y firmar descargas S3.
+En Vercel varios nombres `AWS_*` están **reservados**. Usa estos aliases:
+
+```env
+WORKER_DISPATCH_PROVIDER=aws_lambda
+WORKER_AWS_REGION=sa-east-1
+WORKER_AWS_ROLE_ARN=arn:aws:iam::ACCOUNT:role/tocheck-reportes-qa-vercel-invoke
+WORKER_LAMBDA_FUNCTION_NAME=tocheck-reportes-worker-qa
+STORAGE_BACKEND=s3
+AWS_S3_BUCKET=...
+AWS_S3_REGION=sa-east-1
+```
+
+El mismo rol (`WORKER_AWS_ROLE_ARN`) sirve para invocar Lambda y firmar descargas S3.
 
 ## Prueba rápida
 

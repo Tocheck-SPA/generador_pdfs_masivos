@@ -32,9 +32,16 @@ export async function presignArtifact(location: ArtifactLocation): Promise<strin
   }
   if (provider === "s3") {
     const bucket = location.bucket || required("AWS_S3_BUCKET");
-    const roleArn = process.env.AWS_S3_ROLE_ARN || process.env.AWS_ROLE_ARN;
+    const roleArn =
+      process.env.AWS_S3_ROLE_ARN ||
+      process.env.WORKER_AWS_ROLE_ARN ||
+      process.env.AWS_ROLE_ARN;
     const client = g.__tocheckS3ArtifactClient ??= new S3Client({
-      region: process.env.AWS_S3_REGION || process.env.AWS_REGION || "us-east-1",
+      region:
+        process.env.AWS_S3_REGION ||
+        process.env.WORKER_AWS_REGION ||
+        process.env.AWS_REGION ||
+        "us-east-1",
       ...(roleArn ? { credentials: awsCredentialsProvider({ roleArn }) } : {}),
     });
     return getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: location.key }), {

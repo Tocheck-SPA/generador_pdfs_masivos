@@ -6,9 +6,10 @@ let client: LambdaClient | null = null;
 
 function getClient(): LambdaClient {
   if (client) return client;
-  const roleArn = process.env.AWS_ROLE_ARN;
+  // En Vercel, AWS_REGION / varios AWS_* están reservados; usar WORKER_*.
+  const roleArn = env("WORKER_AWS_ROLE_ARN", "AWS_ROLE_ARN");
   client = new LambdaClient({
-    region: required("AWS_REGION"),
+    region: required("WORKER_AWS_REGION", "AWS_REGION"),
     ...(roleArn
       ? { credentials: awsCredentialsProvider({ roleArn }) }
       : {}),
@@ -20,8 +21,8 @@ export async function dispatchLambdaJob(
   input: WorkerDispatchInput
 ): Promise<WorkerDispatchResult> {
   const result = await getClient().send(new InvokeCommand({
-    FunctionName: required("AWS_LAMBDA_FUNCTION_NAME"),
-    Qualifier: process.env.AWS_LAMBDA_QUALIFIER || undefined,
+    FunctionName: required("WORKER_LAMBDA_FUNCTION_NAME", "AWS_LAMBDA_FUNCTION_NAME"),
+    Qualifier: process.env.WORKER_LAMBDA_QUALIFIER || process.env.AWS_LAMBDA_QUALIFIER || undefined,
     InvocationType: "Event",
     Payload: Buffer.from(JSON.stringify({ schemaVersion: 1, jobId: input.jobId })),
   }));
@@ -31,8 +32,16 @@ export async function dispatchLambdaJob(
   return { provider: "aws_lambda", externalExecutionId: result.$metadata.requestId };
 }
 
-function required(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`Falta la variable ${name}.`);
+function env(...names: string[]): string | undefined {
+  for (const name of names) {
+    const value = process.env[name];
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function required(...names: string[]): string {
+  const value = env(...names);
+  if (!value) throw new Error(`Falta la variable ${names.join(" o ")}.`);
   return value;
 }
