@@ -17,6 +17,17 @@ Plantilla: [`worker-lambda.yaml`](./worker-lambda.yaml)
 
 No crea API Gateway, VPC ni NAT.
 
+### OIDC Vercel ↔ AWS (QA)
+
+Si al crear un trabajo falla con `web identity token could not be validated`:
+
+1. En Vercel → Project → Settings → Security → **OIDC issuer mode**:
+   - **Team** → provider IAM `oidc.vercel.com/<TeamSlug>`
+   - **Global** → provider IAM `oidc.vercel.com`
+2. El `aud` del token debe estar en el Client ID list del provider (p. ej. `https://vercel.com/<TeamSlug>`).
+3. El `sub` debe coincidir con el trust del rol (`owner:<slug>:project:<name>:environment:*`).
+4. Fallback QA (sin OIDC): vars `WORKER_AWS_ACCESS_KEY_ID` / `WORKER_AWS_SECRET_ACCESS_KEY` (prioridad sobre el rol).
+
 ## Despliegue en 2 fases
 
 La Lambda no puede crearse sin una imagen ya publicada en ECR.

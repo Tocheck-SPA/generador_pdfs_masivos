@@ -1,6 +1,6 @@
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { awsCredentialsProvider } from "@vercel/oidc-aws-credentials-provider";
+import { workerAwsCredentials } from "./awsCredentials";
 
 export interface ArtifactLocation {
   provider: string | null;
@@ -32,24 +32,14 @@ export async function presignArtifact(location: ArtifactLocation): Promise<strin
   }
   if (provider === "s3") {
     const bucket = location.bucket || required("AWS_S3_BUCKET");
-    const roleArn =
-      process.env.AWS_S3_ROLE_ARN ||
-      process.env.WORKER_AWS_ROLE_ARN ||
-      process.env.AWS_ROLE_ARN;
+    const credentials = workerAwsCredentials();
     const client = g.__tocheckS3ArtifactClient ??= new S3Client({
       region:
         process.env.AWS_S3_REGION ||
         process.env.WORKER_AWS_REGION ||
         process.env.AWS_REGION ||
         "us-east-1",
-      ...(roleArn
-        ? {
-            credentials: awsCredentialsProvider({
-              roleArn,
-              audience: "sts.amazonaws.com",
-            }),
-          }
-        : {}),
+      ...(credentials ? { credentials } : {}),
     });
     return getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: location.key }), {
       expiresIn: Number(process.env.REPORT_LINK_EXPIRATION_SECONDS || 1_296_000),
