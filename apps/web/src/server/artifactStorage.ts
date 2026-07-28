@@ -48,12 +48,13 @@ export async function presignArtifact(location: ArtifactLocation): Promise<strin
   if (provider === "s3") {
     const bucket = location.bucket || required("AWS_S3_BUCKET");
     const credentials = workerAwsCredentials();
+    // No usar AWS_REGION: Vercel lo sobrescribe con la región de la función.
+    const region =
+      process.env.AWS_S3_REGION ||
+      process.env.WORKER_AWS_REGION ||
+      "us-east-1";
     const client = g.__tocheckS3ArtifactClient ??= new S3Client({
-      region:
-        process.env.AWS_S3_REGION ||
-        process.env.WORKER_AWS_REGION ||
-        process.env.AWS_REGION ||
-        "us-east-1",
+      region,
       ...(credentials ? { credentials } : {}),
     });
     return getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: location.key }), {
