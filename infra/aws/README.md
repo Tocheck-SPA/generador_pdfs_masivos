@@ -168,8 +168,8 @@ aws cloudformation deploy \
     RdsHost="....rds.amazonaws.com" \
     RdsUser=readonly_user \
     RdsPass="..." \
-    RdsDb=tocheck_prod \
-    CompanyIds=254 \
+    RdsDb="..." \
+    CompanyIds=... \
     ScheduleExpression="cron(0 4 * * ? *)" \
     ScheduleTimezone=America/Santiago
     # Si RDS es privado, descomenta y completa:
