@@ -174,8 +174,13 @@ def process_job(
                 except Exception as exc:  # noqa: BLE001 - aislar fallo por respuesta
                     processed += 1
                     failed += 1
-                    log_context(_log, 40, "fallo al generar PDF", job_id=ctx.job_id,
-                                source_response_id=response_id, error_code="PDF_RENDER_ERROR")
+                    log_context(
+                        _log, 40, "fallo al generar PDF",
+                        job_id=ctx.job_id,
+                        source_response_id=response_id,
+                        error_code="PDF_RENDER_ERROR",
+                        error=str(exc)[:300],
+                    )
                     items.append(ItemResult(
                         response_id=response_id, status="failed",
                         error_code="PDF_RENDER_ERROR", error_message=str(exc)[:500],

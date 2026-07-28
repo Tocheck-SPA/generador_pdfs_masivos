@@ -14,7 +14,9 @@ export async function GET(
     const url = await getStore().getDownloadUrl(params.jobId);
     if (!url) return jsonError("La descarga aún no está disponible", 404);
     return NextResponse.redirect(url, 302);
-  } catch {
-    return jsonError("No se pudo obtener la descarga", 500);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error("download failed", params.jobId, detail);
+    return jsonError(`No se pudo obtener la descarga: ${detail}`, 500);
   }
 }

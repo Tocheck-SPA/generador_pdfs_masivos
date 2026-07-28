@@ -8,6 +8,19 @@ from .jobs.runner import run_worker_job
 
 
 def handler(event: dict, context) -> dict:
+    if isinstance(event, dict) and event.get("debug") == "chromium":
+        from .reports.renderer import probe_chromium
+
+        try:
+            return {"schemaVersion": 1, "debug": "chromium", **probe_chromium()}
+        except Exception as exc:  # noqa: BLE001 - devolver detalle a quien invoca
+            return {
+                "schemaVersion": 1,
+                "debug": "chromium",
+                "ok": False,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+
     if not isinstance(event, dict) or event.get("schemaVersion") != 1:
         raise ValueError("Evento Lambda inválido: schemaVersion debe ser 1")
     raw_job_id = event.get("jobId")

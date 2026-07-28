@@ -12,6 +12,10 @@ COPY templates ./templates
 
 ENV FIXTURES_DIR=/fixtures
 ENV PYTHONUNBUFFERED=1
+# Chromium en Lambda necesita HOME escribible
+ENV HOME=/tmp
+ENV XDG_CONFIG_HOME=/tmp/.config
+ENV XDG_CACHE_HOME=/tmp/.cache
 
 ENTRYPOINT ["python", "-m", "awslambdaric"]
 CMD ["app.lambda_handler.handler"]
