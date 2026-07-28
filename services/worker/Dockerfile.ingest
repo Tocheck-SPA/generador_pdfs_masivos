@@ -1,0 +1,9 @@
+# Lambda liviana solo para ingest MySQL → Postgres (sin Playwright).
+FROM public.ecr.aws/lambda/python:3.12
+
+COPY requirements-ingest.txt .
+RUN pip install --no-cache-dir -r requirements-ingest.txt
+
+COPY app ${LAMBDA_TASK_ROOT}/app
+
+CMD ["app.ingest_lambda_handler.handler"]

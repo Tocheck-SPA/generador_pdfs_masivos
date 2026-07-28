@@ -1,14 +1,14 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
   ToCheck Reportes — worker en AWS Lambda (imagen Docker en ECR).
-  No incluye API Gateway ni VPC. Almacenamiento típico: Cloudflare R2.
-  Correo: Resend. Cola/datos: Neon (fuera de este stack).
+  Incluye bucket S3 de artefactos y SES. Sin API Gateway ni VPC.
+  Cola/datos: Neon (fuera de este stack). R2 sigue soportado vía parámetros.
 
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label: { default: "Nombres y región lógica" }
-        Parameters: [ProjectName, FunctionName, EcrRepositoryName]
+        Parameters: [ProjectName, FunctionName, EcrRepositoryName, ArtifactsBucketName]
       - Label: { default: "Imagen Lambda" }
         Parameters: [ImageUri, MemorySizeMB, TimeoutSeconds, EphemeralStorageMB]
       - Label: { default: "OIDC Vercel (invoke)" }
@@ -22,6 +22,8 @@ Metadata:
           - DatabaseUrl
           - SourceAdapter
           - StorageBackend
+          - AwsS3Prefix
+          - ReportRetentionDays
           - R2AccountId
           - R2AccessKeyId
           - R2SecretAccessKey
@@ -30,6 +32,7 @@ Metadata:
           - R2Region
           - EmailBackend
           - ResendApiKey
+          - SesRegion
           - EmailFrom
           - EmailReplyTo
           - SourceAssetBaseUrl
@@ -55,12 +58,19 @@ Parameters:
     Default: tocheck-reportes-worker
     Description: Nombre del repositorio ECR.
 
+  ArtifactsBucketName:
+    Type: String
+    Default: ""
+    Description: >
+      Nombre del bucket S3. Vacío = se genera
+      {ProjectName}-artifacts-{AccountId}-{Region}.
+
   ImageUri:
     Type: String
     Default: ""
     Description: >
       URI completa de la imagen en ECR (cuenta.dkr.ecr.región.amazonaws.com/repo:tag).
-      Vacío = solo crea ECR + IAM (fase 1). Con valor = crea/actualiza la Lambda (fase 2).
+      Vacío = solo crea ECR + S3 + IAM (fase 1). Con valor = crea/actualiza la Lambda (fase 2).
 
   MemorySizeMB:
     Type: Number
@@ -118,9 +128,21 @@ Parameters:
 
   StorageBackend:
     Type: String
-    Default: r2
-    AllowedValues: [r2, s3, local]
-    Description: Backend de artefactos (recomendado r2).
+    Default: s3
+    AllowedValues: [s3, r2, local]
+    Description: Backend de artefactos (recomendado s3 en AWS).
+
+  AwsS3Prefix:
+    Type: String
+    Default: reports
+    Description: Prefijo de claves en el bucket S3.
+
+  ReportRetentionDays:
+    Type: Number
+    Default: 90
+    MinValue: 1
+    MaxValue: 3650
+    Description: Días hasta expirar objetos bajo el prefijo de reportes.
 
   R2AccountId:
     Type: String
@@ -151,13 +173,18 @@ Parameters:
 
   EmailBackend:
     Type: String
-    Default: resend
-    AllowedValues: [resend, console]
+    Default: ses
+    AllowedValues: [ses, resend, console]
 
   ResendApiKey:
     Type: String
     Default: ""
     NoEcho: true
+
+  SesRegion:
+    Type: String
+    Default: ""
+    Description: Región SES (vacío = misma región de la Lambda / AWS_REGION).
 
   EmailFrom:
     Type: String
@@ -195,8 +222,39 @@ Conditions:
   CreateLambda: !Not [!Equals [!Ref ImageUri, ""]]
   CreateOidcProvider: !Equals [!Ref ExistingOidcProviderArn, ""]
   UseExistingOidcProvider: !Not [!Equals [!Ref ExistingOidcProviderArn, ""]]
+  HasCustomBucketName: !Not [!Equals [!Ref ArtifactsBucketName, ""]]
 
 Resources:
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !If
+        - HasCustomBucketName
+        - !Ref ArtifactsBucketName
+        - !Sub ${ProjectName}-artifacts-${AWS::AccountId}-${AWS::Region}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireReports
+            Status: Enabled
+            Prefix: !Sub ${AwsS3Prefix}/
+            ExpirationInDays: !Ref ReportRetentionDays
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Component
+          Value: artifacts
+
   WorkerEcrRepository:
     Type: AWS::ECR::Repository
     Properties:
@@ -253,6 +311,30 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: !GetAtt WorkerLogGroup.Arn
+        - PolicyName: WorkerSes
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ses:SendEmail
+                  - ses:SendRawEmail
+                Resource: "*"
+        - PolicyName: WorkerS3Artifacts
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:HeadObject
+                  - s3:DeleteObject
+                Resource: !Sub ${ArtifactsBucket.Arn}/*
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !GetAtt ArtifactsBucket.Arn
       Tags:
         - Key: Project
           Value: !Ref ProjectName
@@ -312,6 +394,18 @@ Resources:
                 Resource:
                   - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FunctionName}
                   - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FunctionName}:*
+        - PolicyName: PresignS3Artifacts
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: !Sub ${ArtifactsBucket.Arn}/*
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !GetAtt ArtifactsBucket.Arn
       Tags:
         - Key: Project
           Value: !Ref ProjectName
@@ -322,6 +416,7 @@ Resources:
     DependsOn:
       - WorkerLogGroup
       - WorkerExecutionRole
+      - ArtifactsBucket
     Properties:
       FunctionName: !Ref FunctionName
       PackageType: Image
@@ -340,6 +435,9 @@ Resources:
           DATABASE_URL: !Ref DatabaseUrl
           SOURCE_ADAPTER: !Ref SourceAdapter
           STORAGE_BACKEND: !Ref StorageBackend
+          AWS_S3_BUCKET: !Ref ArtifactsBucket
+          AWS_S3_REGION: !Ref AWS::Region
+          AWS_S3_PREFIX: !Ref AwsS3Prefix
           R2_ACCOUNT_ID: !Ref R2AccountId
           R2_ACCESS_KEY_ID: !Ref R2AccessKeyId
           R2_SECRET_ACCESS_KEY: !Ref R2SecretAccessKey
@@ -348,6 +446,7 @@ Resources:
           R2_REGION: !Ref R2Region
           EMAIL_BACKEND: !Ref EmailBackend
           RESEND_API_KEY: !Ref ResendApiKey
+          SES_REGION: !Ref SesRegion
           EMAIL_FROM: !Ref EmailFrom
           EMAIL_REPLY_TO: !Ref EmailReplyTo
           SOURCE_ASSET_BASE_URL: !Ref SourceAssetBaseUrl
@@ -356,6 +455,7 @@ Resources:
           MAX_RESPONSES_PER_JOB: !Sub "${MaxResponsesPerJob}"
           PDF_MAX_CONCURRENCY: !Sub "${PdfMaxConcurrency}"
           PDF_RENDER_TIMEOUT_SECONDS: !Sub "${PdfRenderTimeoutSeconds}"
+          REPORT_RETENTION_DAYS: !Sub "${ReportRetentionDays}"
           WORKER_ID: !Sub lambda-${FunctionName}
       Tags:
         - Key: Project
@@ -371,6 +471,14 @@ Outputs:
   EcrRepositoryName:
     Description: Nombre del repositorio ECR.
     Value: !Ref WorkerEcrRepository
+
+  ArtifactsBucketName:
+    Description: Bucket S3 de artefactos (AWS_S3_BUCKET en Vercel/Lambda).
+    Value: !Ref ArtifactsBucket
+
+  ArtifactsBucketArn:
+    Description: ARN del bucket S3 de artefactos.
+    Value: !GetAtt ArtifactsBucket.Arn
 
   LambdaFunctionName:
     Condition: CreateLambda
@@ -398,6 +506,10 @@ Outputs:
         AWS_REGION=${Region}
         AWS_ROLE_ARN=${RoleArn}
         AWS_LAMBDA_FUNCTION_NAME=${FunctionName}
+        STORAGE_BACKEND=s3
+        AWS_S3_BUCKET=${Bucket}
+        AWS_S3_REGION=${Region}
       - Region: !Ref AWS::Region
         RoleArn: !GetAtt VercelInvokeRole.Arn
         FunctionName: !Ref FunctionName
+        Bucket: !Ref ArtifactsBucket

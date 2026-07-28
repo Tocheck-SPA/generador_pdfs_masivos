@@ -187,6 +187,10 @@ python -m app.main ingest --company-id 254 --lookback-days 7
 La corrida incremental continua desde la ultima sincronizacion completada. Para
 un backfill controlado se pueden indicar `--date-from` y `--date-to-exclusive`.
 
+Para automatizar el ingest diario en AWS (Lambda liviana + EventBridge a las
+04:00 America/Santiago), ver [infra/aws/README.md](infra/aws/README.md#ingest-diario-lambda-liviana--eventbridge)
+y `infra/aws/ingest-lambda.yaml`.
+
 La UI consulta el estado del snapshot y muestra la ultima actualizacion y si el
 rango solicitado esta cubierto.
 
@@ -246,14 +250,52 @@ el backend no rompe las descargas anteriores.
 
 ### Worker en AWS
 
-TI puede usar el CloudFormation en `infra/aws/` (ECR + Lambda + rol OIDC) o
+TI puede usar el CloudFormation en `infra/aws/` (ECR + Lambda + S3 + SES + rol OIDC) o
 publicar `services/worker/Dockerfile.lambda` en ECR y crear una Lambda
 basada en esa imagen. La función recibe `{ "schemaVersion": 1, "jobId": "UUID" }`
-y usa las mismas variables de Neon, almacenamiento y correo del worker.
+y usa las mismas variables de Postgres operativo, almacenamiento y correo del worker.
 
 No se requiere acceso del worker a MySQL/RDS. La única validación pendiente de
 infraestructura es publicar la imagen, configurar IAM/OIDC y ejecutar un smoke
 test real desde la UI.
+
+## Bases de datos: Postgres operativo vs MySQL fuente
+
+Hoy hay **dos roles**. En runtime la app operativa **solo habla Postgres**.
+
+| Rol | Motor hoy | Qué guarda |
+|-----|-----------|------------|
+| **Fuente ToCheck** | MySQL (RDS) | Respuestas de checklist. Lectura vía `ingest`. |
+| **Base operativa** | Postgres (p. ej. Neon) | Cola de jobs, ítems, artefactos, snapshot, usuarios (`DATABASE_URL`). |
+
+```text
+MySQL RDS (ToCheck)  --ingest-->  Postgres (Neon u otro)
+                                     ↑
+                           Vercel + Lambda (DATABASE_URL)
+```
+
+### Objetivo de migración a AWS: un solo MySQL RDS
+
+Para no mantener un segundo motor (Neon / RDS Postgres) y reutilizar la
+infraestructura MySQL ya existente, la base operativa **debería migrarse a
+RDS MySQL** (misma instancia o schema dedicado, según política de TI).
+
+Eso **no es un cambio de `DATABASE_URL`**: el código operativo actual está
+adaptado a **Postgres** (`pg` / `psycopg`, migraciones con `JSONB`,
+`FOR UPDATE SKIP LOCKED`, etc.). Migrar implica portar:
+
+1. Migraciones en `database/migrations/` → dialecto MySQL.
+2. Cliente web (`apps/web` / `pg`) y worker (`psycopg`) → MySQL.
+3. Consultas de claim/cola, snapshot y artefactos a sintaxis MySQL.
+4. Pruebas (`TEST_DATABASE_URL`, claim atómico, etc.).
+5. Dejar de requerir Neon (o cualquier Postgres) en Vercel y Lambda.
+
+Hasta ese port, QA/producción siguen necesitando un Postgres para
+`DATABASE_URL`. MySQL RDS sigue siendo solo la **fuente** vía ingest.
+
+> Nota: conviene un **schema/usuario separado** dentro del MySQL de ToCheck
+> (o al menos tablas prefijadas) para no mezclar la cola de reportes con el
+> esquema de la app principal, aunque sea la misma instancia RDS.
 
 ## Pruebas
 

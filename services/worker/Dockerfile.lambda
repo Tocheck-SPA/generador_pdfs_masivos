@@ -3,7 +3,7 @@ FROM mcr.microsoft.com/playwright/python:v1.48.0-jammy
 
 WORKDIR /app
 
-COPY requirements-lambda.txt ./
+COPY requirements.txt requirements-lambda.txt ./
 RUN pip install --no-cache-dir -r requirements-lambda.txt \
     && python -m playwright install chromium
 

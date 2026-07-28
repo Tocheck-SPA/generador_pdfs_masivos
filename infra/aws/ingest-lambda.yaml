@@ -1,0 +1,285 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  ToCheck Reportes — ingest diario MySQL → Postgres vía Lambda liviana + EventBridge Scheduler.
+  Separado del worker de PDFs (sin Playwright).
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: { default: "Nombres" }
+        Parameters: [ProjectName, FunctionName, EcrRepositoryName]
+      - Label: { default: "Imagen" }
+        Parameters: [ImageUri, MemorySizeMB, TimeoutSeconds]
+      - Label: { default: "Schedule" }
+        Parameters: [ScheduleExpression, ScheduleTimezone, CompanyIds, LookbackDays]
+      - Label: { default: "Postgres operativo (Neon u otro)" }
+        Parameters: [DatabaseUrl]
+      - Label: { default: "MySQL fuente (RDS)" }
+        Parameters: [RdsHost, RdsPort, RdsUser, RdsPass, RdsDb, SourceDatabaseUseSsl]
+      - Label: { default: "VPC (requerido si RDS es privado)" }
+        Parameters: [VpcSubnetIds, VpcSecurityGroupIds]
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: tocheck-reportes-ingest
+
+  FunctionName:
+    Type: String
+    Default: tocheck-reportes-ingest
+
+  EcrRepositoryName:
+    Type: String
+    Default: tocheck-reportes-ingest
+
+  ImageUri:
+    Type: String
+    Default: ""
+    Description: URI ECR de Dockerfile.ingest. Vacío = solo ECR + IAM (fase 1).
+
+  MemorySizeMB:
+    Type: Number
+    Default: 512
+    MinValue: 128
+    MaxValue: 3008
+
+  TimeoutSeconds:
+    Type: Number
+    Default: 900
+    MinValue: 60
+    MaxValue: 900
+
+  ScheduleExpression:
+    Type: String
+    Default: cron(0 4 * * ? *)
+    Description: Expresión cron del Scheduler (minuto hora ...). Default 04:00.
+
+  ScheduleTimezone:
+    Type: String
+    Default: America/Santiago
+
+  CompanyIds:
+    Type: String
+    Default: "254"
+    Description: IDs de empresa separados por coma (ej. 254 o 254,100).
+
+  LookbackDays:
+    Type: Number
+    Default: 7
+    Description: Solo aplica en la primera corrida (sin sync previo). Luego es incremental.
+
+  DatabaseUrl:
+    Type: String
+    NoEcho: true
+    Default: ""
+
+  RdsHost:
+    Type: String
+    Default: ""
+
+  RdsPort:
+    Type: Number
+    Default: 3306
+
+  RdsUser:
+    Type: String
+    Default: ""
+
+  RdsPass:
+    Type: String
+    NoEcho: true
+    Default: ""
+
+  RdsDb:
+    Type: String
+    Default: ""
+
+  SourceDatabaseUseSsl:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+
+  VpcSubnetIds:
+    Type: CommaDelimitedList
+    Default: ""
+    Description: Subnets privadas con ruta a RDS (y NAT si Neon es público). Vacío = sin VPC.
+
+  VpcSecurityGroupIds:
+    Type: CommaDelimitedList
+    Default: ""
+    Description: SG que el RDS permita. Vacío = sin VPC.
+
+Conditions:
+  CreateLambda: !Not [!Equals [!Ref ImageUri, ""]]
+  UseVpc: !Not [!Equals [!Join ["", !Ref VpcSubnetIds], ""]]
+
+Resources:
+  IngestEcrRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Ref EcrRepositoryName
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      ImageTagMutability: MUTABLE
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [{
+              "rulePriority": 1,
+              "description": "Keep last 10 images",
+              "selection": {
+                "tagStatus": "any",
+                "countType": "imageCountMoreThan",
+                "countNumber": 10
+              },
+              "action": { "type": "expire" }
+            }]
+          }
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  IngestLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${FunctionName}
+      RetentionInDays: 30
+
+  IngestExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-lambda-exec
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns: !If
+        - UseVpc
+        - - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+        - []
+      Policies:
+        - PolicyName: IngestLogs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !GetAtt IngestLogGroup.Arn
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  SchedulerInvokeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-scheduler
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeIngestLambda
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource:
+                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FunctionName}
+                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FunctionName}:*
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  IngestLambda:
+    Type: AWS::Lambda::Function
+    Condition: CreateLambda
+    DependsOn:
+      - IngestLogGroup
+      - IngestExecutionRole
+    Properties:
+      FunctionName: !Ref FunctionName
+      PackageType: Image
+      Role: !GetAtt IngestExecutionRole.Arn
+      Code:
+        ImageUri: !Ref ImageUri
+      MemorySize: !Ref MemorySizeMB
+      Timeout: !Ref TimeoutSeconds
+      Architectures:
+        - x86_64
+      Description: Ingest diario MySQL → snapshot Postgres
+      Environment:
+        Variables:
+          DATABASE_URL: !Ref DatabaseUrl
+          SOURCE_ADAPTER: mysql
+          SOURCE_COMPANY_ID: !Select [0, !Split [",", !Ref CompanyIds]]
+          RDS_HOST: !Ref RdsHost
+          RDS_PORT: !Sub "${RdsPort}"
+          RDS_USER: !Ref RdsUser
+          RDS_PASS: !Ref RdsPass
+          RDS_DB: !Ref RdsDb
+          SOURCE_DATABASE_USE_SSL: !Ref SourceDatabaseUseSsl
+      VpcConfig: !If
+        - UseVpc
+        - SubnetIds: !Ref VpcSubnetIds
+          SecurityGroupIds: !Ref VpcSecurityGroupIds
+        - !Ref AWS::NoValue
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Component
+          Value: ingest
+
+  IngestSchedule:
+    Type: AWS::Scheduler::Schedule
+    Condition: CreateLambda
+    Properties:
+      Name: !Sub ${ProjectName}-daily
+      Description: Ingest snapshot diario a las 04:00 (timezone configurada)
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      ScheduleExpression: !Ref ScheduleExpression
+      ScheduleExpressionTimezone: !Ref ScheduleTimezone
+      State: ENABLED
+      Target:
+        Arn: !GetAtt IngestLambda.Arn
+        RoleArn: !GetAtt SchedulerInvokeRole.Arn
+        Input: !Sub
+          - |
+            {"schemaVersion":1,"companyIds":"${Ids}","lookbackDays":${Days}}
+          - Ids: !Ref CompanyIds
+            Days: !Ref LookbackDays
+
+Outputs:
+  EcrRepositoryUri:
+    Description: Push Dockerfile.ingest aquí.
+    Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${IngestEcrRepository}
+
+  LambdaFunctionName:
+    Condition: CreateLambda
+    Value: !Ref IngestLambda
+
+  ScheduleName:
+    Condition: CreateLambda
+    Value: !Ref IngestSchedule
+
+  InvokeHint:
+    Condition: CreateLambda
+    Description: Prueba manual del ingest.
+    Value: !Sub
+      - |
+        aws lambda invoke --region ${Region} --function-name ${Fn} \
+          --cli-binary-format raw-in-base64-out \
+          --payload '{"schemaVersion":1,"companyIds":[254],"lookbackDays":7}' \
+          /tmp/ingest-out.json
+      - Region: !Ref AWS::Region
+        Fn: !Ref FunctionName

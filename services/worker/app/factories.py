@@ -55,8 +55,20 @@ def build_storage(settings: Settings) -> Storage:
 
 
 def build_email_sender(settings: Settings) -> EmailSender:
+    if settings.email_backend not in ("console", "resend", "ses"):
+        raise ValueError(
+            "EMAIL_BACKEND must be one of: console, resend, ses; "
+            f"received {settings.email_backend!r}"
+        )
     if settings.email_backend == "resend":
         from .email.resend_email import ResendEmailSender
 
         return ResendEmailSender(settings.resend_api_key, settings.email_from)
+    if settings.email_backend == "ses":
+        from .email.ses_email import SesEmailSender
+
+        return SesEmailSender(
+            settings.email_from,
+            region=settings.ses_region or None,
+        )
     return ConsoleEmailSender()

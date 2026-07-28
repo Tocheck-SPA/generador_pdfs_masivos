@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Despliegue QA del worker en sa-east-1 (São Paulo).
+# Despliegue QA del worker en sa-east-1 (São Paulo) — S3 + SES.
 # Uso:
 #   1) Completa las variables de la sección CONFIG
 #   2) Fase 1:  ./infra/aws/deploy-qa.sh phase1
@@ -19,21 +19,16 @@ ECR_REPO="tocheck-reportes-worker-qa"
 PROJECT_NAME="tocheck-reportes-qa"
 
 # Vercel QA
-VERCEL_TEAM_SLUG="TU_TEAM"          # ej. tocheck
-VERCEL_PROJECT_NAME="TU_PROYECTO"   # nombre del proyecto en Vercel
-VERCEL_ENVIRONMENT="preview"        # o production si QA usa ese env
-# Si el OIDC ya existe en la cuenta, descomenta y completa:
-# EXISTING_OIDC_ARN="arn:aws:iam::ACCOUNT:oidc-provider/oidc.vercel.com/${VERCEL_TEAM_SLUG}"
-EXISTING_OIDC_ARN=""
+VERCEL_TEAM_SLUG="Tocheck"
+VERCEL_PROJECT_NAME="generador-pdfs-masivos-web"
+VERCEL_ENVIRONMENT="production"
+EXISTING_OIDC_ARN="arn:aws:iam::668779751312:oidc-provider/oidc.vercel.com/Tocheck"
 
-# Solo fase 2 (secrets / Neon / R2 / Resend de QA)
+# Solo fase 2
 DATABASE_URL="postgres://USER:PASS@HOST/DB?sslmode=require"
-R2_ACCOUNT_ID=""
-R2_ACCESS_KEY_ID=""
-R2_SECRET_ACCESS_KEY=""
-R2_BUCKET=""
-R2_ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
-RESEND_API_KEY=""
+STORAGE_BACKEND="s3"
+EMAIL_BACKEND="ses"
+SES_REGION="sa-east-1"
 EMAIL_FROM="reportes@tocheck.cl"
 EMAIL_REPLY_TO=""
 # ----------------------------------------
@@ -47,7 +42,7 @@ if [[ -n "${EXISTING_OIDC_ARN}" ]]; then
 fi
 
 phase1() {
-  echo "==> Fase 1: ECR + IAM en ${REGION} (sin Lambda aún)"
+  echo "==> Fase 1: ECR + S3 + IAM en ${REGION} (sin Lambda aún)"
   aws cloudformation deploy \
     --region "${REGION}" \
     --template-file infra/aws/worker-lambda.yaml \
@@ -60,14 +55,12 @@ phase1() {
       VercelTeamSlug="${VERCEL_TEAM_SLUG}" \
       VercelProjectName="${VERCEL_PROJECT_NAME}" \
       VercelEnvironment="${VERCEL_ENVIRONMENT}" \
+      StorageBackend="${STORAGE_BACKEND}" \
+      EmailBackend="${EMAIL_BACKEND}" \
       ImageUri="" \
       "${OIDC_OVERRIDE[@]+"${OIDC_OVERRIDE[@]}"}"
 
-  aws cloudformation describe-stacks \
-    --region "${REGION}" \
-    --stack-name "${STACK_NAME}" \
-    --query "Stacks[0].Outputs" \
-    --output table
+  outputs
 }
 
 phase2() {
@@ -78,7 +71,7 @@ phase2() {
   docker build -f services/worker/Dockerfile.lambda -t "${IMAGE_URI}" services/worker
   docker push "${IMAGE_URI}"
 
-  echo "==> Fase 2: crear/actualizar Lambda con env de QA"
+  echo "==> Fase 2: crear/actualizar Lambda con env de QA (S3 + SES)"
   aws cloudformation deploy \
     --region "${REGION}" \
     --template-file infra/aws/worker-lambda.yaml \
@@ -94,15 +87,9 @@ phase2() {
       ImageUri="${IMAGE_URI}" \
       DatabaseUrl="${DATABASE_URL}" \
       SourceAdapter=snapshot \
-      StorageBackend=r2 \
-      R2AccountId="${R2_ACCOUNT_ID}" \
-      R2AccessKeyId="${R2_ACCESS_KEY_ID}" \
-      R2SecretAccessKey="${R2_SECRET_ACCESS_KEY}" \
-      R2Bucket="${R2_BUCKET}" \
-      R2Endpoint="${R2_ENDPOINT}" \
-      R2Region=auto \
-      EmailBackend=resend \
-      ResendApiKey="${RESEND_API_KEY}" \
+      StorageBackend="${STORAGE_BACKEND}" \
+      EmailBackend="${EMAIL_BACKEND}" \
+      SesRegion="${SES_REGION}" \
       EmailFrom="${EMAIL_FROM}" \
       EmailReplyTo="${EMAIL_REPLY_TO}" \
       "${OIDC_OVERRIDE[@]+"${OIDC_OVERRIDE[@]}"}"
@@ -123,6 +110,11 @@ outputs() {
     --stack-name "${STACK_NAME}" \
     --query "Stacks[0].Outputs[?OutputKey=='VercelInvokeRoleArn'].OutputValue" \
     --output text)"
+  BUCKET="$(aws cloudformation describe-stacks \
+    --region "${REGION}" \
+    --stack-name "${STACK_NAME}" \
+    --query "Stacks[0].Outputs[?OutputKey=='ArtifactsBucketName'].OutputValue" \
+    --output text)"
 
   cat <<EOF
 
@@ -131,6 +123,9 @@ Variables Vercel (QA):
   AWS_REGION=${REGION}
   AWS_ROLE_ARN=${ROLE_ARN}
   AWS_LAMBDA_FUNCTION_NAME=${FUNCTION_NAME}
+  STORAGE_BACKEND=s3
+  AWS_S3_BUCKET=${BUCKET}
+  AWS_S3_REGION=${REGION}
 
 Prueba invoke (job pending en Neon QA):
   aws lambda invoke \\

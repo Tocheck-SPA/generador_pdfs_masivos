@@ -37,6 +37,11 @@ export class PostgresSource implements SourceReader {
     dateFrom: string,
     dateToExclusive: string
   ): Promise<SourceSnapshotStatus> {
+    // Cobertura por días calendario (como la UI):
+    // - date_from del sync <= inicio del dateFrom
+    // - date_to_exclusive del sync > inicio del último día inclusive
+    //   (dateToExclusive - 1 día). Así un ingest que terminó "hoy a las 12:00"
+    //   cubre el dateTo=hoy, sin exigir medianoche del día siguiente.
     const result = await getPool().query(
       `SELECT
          latest.completed_at AS last_successful_sync_at,
@@ -47,8 +52,8 @@ export class PostgresSource implements SourceReader {
              FROM source_sync_runs covered
             WHERE covered.company_id = $1
               AND covered.status = 'completed'
-              AND covered.date_from <= $2
-              AND covered.date_to_exclusive >= $3
+              AND covered.date_from <= $2::timestamp
+              AND covered.date_to_exclusive > ($3::timestamp - INTERVAL '1 day')
          ) AS is_covered
          FROM (
            SELECT completed_at, date_from, date_to_exclusive

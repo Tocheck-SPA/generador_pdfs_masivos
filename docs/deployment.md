@@ -53,11 +53,18 @@ Aplica `database/migrations/0001_init.sql`. Es idempotente (registra en `schema_
    - Expirar objetos bajo `reports/` a los `REPORT_RETENTION_DAYS` (90) días.
    - Las URLs de descarga se firman con `REPORT_LINK_EXPIRATION_DAYS` (15) días.
 
-## 7–8. Configurar Resend y verificar dominio
+## 7–8. Configurar correo (Resend o SES)
 
+### Resend
 1. Crea una API key en Resend → `RESEND_API_KEY`, `EMAIL_BACKEND=resend`.
 2. Verifica el dominio remitente (`EMAIL_FROM=reportes@tocheck.cl`) con los registros DNS que indica Resend.
 3. Opcional: `EMAIL_REPLY_TO`.
+
+### Amazon SES
+1. Verifica el dominio o la dirección remitente en SES (misma región que uses, p. ej. `sa-east-1`).
+2. Sal de sandbox si necesitas enviar a destinatarios no verificados.
+3. En el worker: `EMAIL_BACKEND=ses`, `EMAIL_FROM=...`, opcional `SES_REGION=sa-east-1`.
+4. La Lambda usa su execution role (`ses:SendEmail` / `ses:SendRawEmail`); no hace falta API key.
 
 ## 9. Desplegar la web en Vercel
 

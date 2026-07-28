@@ -123,19 +123,19 @@ R2_ENDPOINT=
 R2_REGION=auto
 ```
 
-### S3
+### S3 (recomendado en AWS)
 
 ```env
 STORAGE_BACKEND=s3
 AWS_S3_BUCKET=
-AWS_S3_REGION=us-east-1
+AWS_S3_REGION=sa-east-1
 AWS_S3_PREFIX=reports
-AWS_S3_ENDPOINT=
-AWS_S3_ROLE_ARN=
 ```
 
-Lambda debe usar su execution role para S3. Cloud Run debe recibir credenciales
-temporales o secretos administrados; nunca versionar credenciales.
+El CloudFormation en `infra/aws/` crea el bucket y otorga permisos al rol de
+Lambda (put/get) y al rol OIDC de Vercel (get/presign). No uses access keys
+permanentes. Cloud Run, si se usa, debe recibir credenciales temporales o
+secretos administrados.
 
 ## Acciones de TI
 

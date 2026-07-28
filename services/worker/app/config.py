@@ -79,8 +79,10 @@ class Settings(BaseSettings):
     report_retention_days: int = Field(default=90, alias="REPORT_RETENTION_DAYS")
 
     # Correo
-    email_backend: str = Field(default="console", alias="EMAIL_BACKEND")  # console | resend
+    email_backend: str = Field(default="console", alias="EMAIL_BACKEND")  # console | resend | ses
     resend_api_key: str = Field(default="", alias="RESEND_API_KEY")
+    # Región SES (vacío = default de boto3 / AWS_REGION del entorno).
+    ses_region: str = Field(default="", alias="SES_REGION")
     email_from: str = Field(default="reportes@tocheck.cl", alias="EMAIL_FROM")
     email_reply_to: str = Field(default="", alias="EMAIL_REPLY_TO")
     max_email_attachment_bytes: int = Field(default=25_000_000, alias="MAX_EMAIL_ATTACHMENT_BYTES")
