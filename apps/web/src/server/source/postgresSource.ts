@@ -37,31 +37,38 @@ export class PostgresSource implements SourceReader {
     dateFrom: string,
     dateToExclusive: string
   ): Promise<SourceSnapshotStatus> {
-    // Cobertura por días calendario (como la UI):
-    // - date_from del sync <= inicio del dateFrom
-    // - date_to_exclusive del sync > inicio del último día inclusive
-    //   (dateToExclusive - 1 día). Así un ingest que terminó "hoy a las 12:00"
-    //   cubre el dateTo=hoy, sin exigir medianoche del día siguiente.
+    // is_covered si el sync abarca el rango O si ya hay snapshots en ese rango
+    // (alineado con el conteo de la UI, que lee source_response_snapshots).
     const result = await getPool().query(
       `SELECT
          latest.completed_at AS last_successful_sync_at,
          latest.date_from AS covered_from,
          latest.date_to_exclusive AS covered_to_exclusive,
-         EXISTS (
-           SELECT 1
-             FROM source_sync_runs covered
-            WHERE covered.company_id = $1
-              AND covered.status = 'completed'
-              AND covered.date_from <= $2::timestamp
-              AND covered.date_to_exclusive > ($3::timestamp - INTERVAL '1 day')
+         (
+           EXISTS (
+             SELECT 1
+               FROM source_sync_runs covered
+              WHERE covered.company_id = $1
+                AND covered.status = 'completed'
+                AND covered.date_from <= $2::timestamp
+                AND covered.date_to_exclusive > ($3::timestamp - INTERVAL '1 day')
+           )
+           OR EXISTS (
+             SELECT 1
+               FROM source_response_snapshots snap
+              WHERE snap.company_id = $1
+                AND snap.completed_at >= $2::timestamp
+                AND snap.completed_at < $3::timestamp
+           )
          ) AS is_covered
-         FROM (
+         FROM (SELECT 1) AS seed
+         LEFT JOIN LATERAL (
            SELECT completed_at, date_from, date_to_exclusive
              FROM source_sync_runs
             WHERE company_id = $1 AND status = 'completed'
             ORDER BY completed_at DESC NULLS LAST
             LIMIT 1
-         ) latest`,
+         ) latest ON TRUE`,
       [companyId, fromBound(dateFrom), toBound(dateToExclusive)]
     );
     const row = result.rows[0];

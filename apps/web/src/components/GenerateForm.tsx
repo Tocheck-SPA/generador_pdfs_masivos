@@ -199,7 +199,9 @@ export default function GenerateForm({
     !hasInvalidRecipient &&
     hasCount &&
     !snapshotStatusLoading &&
-    !snapshotUnavailable &&
+    // Si hay respuestas contadas, no bloqueamos por cobertura de sync
+    // (el aviso naranja puede seguir visible cuando !isCovered).
+    (!snapshotUnavailable || hasCount) &&
     !submitting;
 
   function formatSnapshotDate(value: string | null): string {
@@ -346,7 +348,9 @@ export default function GenerateForm({
           </p>
           {snapshotUnavailable && (
             <p className="snapshot-warning">
-              No hay snapshot disponible para este período. Solicita o ejecuta una nueva ingesta.
+              La última ingesta no cubre todo este rango de fechas. Aun así puedes
+              generar si hay respuestas; para cubrir el período completo ejecuta
+              una ingesta con --date-from / --date-to-exclusive.
             </p>
           )}
         </div>
