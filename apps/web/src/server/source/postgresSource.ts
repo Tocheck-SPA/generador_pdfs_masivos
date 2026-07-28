@@ -164,7 +164,10 @@ export class PostgresSource implements SourceReader {
     return result.rows.map((r) => ({
       responseId: Number(r.id),
       evaluationPointId: r.point_id === null ? null : Number(r.point_id),
-      completedAt: String(r.completed_at),
+      completedAt:
+        r.completed_at instanceof Date
+          ? r.completed_at.toISOString()
+          : String(r.completed_at),
     }));
   }
 }

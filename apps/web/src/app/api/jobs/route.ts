@@ -112,7 +112,8 @@ export async function POST(request: Request) {
       );
     }
     return NextResponse.json(result, { status: 201 });
-  } catch {
+  } catch (err) {
+    console.error("POST /api/jobs failed", err);
     return jsonError("No se pudo crear el trabajo", 500);
   }
 }
