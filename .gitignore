@@ -14,10 +14,18 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
-# Env
+# Env / secrets
 .env
 .env.local
 .env*.local
+.tmp-*/
+.tmp-*.txt
+.tmp-*.json
+
+# Redirects accidentales de shell (p. ej. salida de aws lambda get-function-configuration)
+/sts *
+/ecr *
+/aws *
 
 # Build artifacts / runtime output
 services/worker/output/
