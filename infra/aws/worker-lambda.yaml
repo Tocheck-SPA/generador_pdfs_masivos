@@ -508,9 +508,9 @@ Outputs:
     Value: !Sub
       - |
         WORKER_DISPATCH_PROVIDER=aws_lambda
-        AWS_REGION=${Region}
-        AWS_ROLE_ARN=${RoleArn}
-        AWS_LAMBDA_FUNCTION_NAME=${FunctionName}
+        WORKER_AWS_REGION=${Region}
+        WORKER_AWS_ROLE_ARN=${RoleArn}
+        WORKER_LAMBDA_FUNCTION_NAME=${FunctionName}
         STORAGE_BACKEND=s3
         AWS_S3_BUCKET=${Bucket}
         AWS_S3_REGION=${Region}

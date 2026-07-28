@@ -7,11 +7,32 @@ type AwsCredentialsProvider = ReturnType<typeof awsCredentialsProvider> | (() =>
   sessionToken?: string;
 }>);
 
+export type WorkerAwsAuthMode = "oidc" | "static" | "default";
+
 /**
  * Credenciales para invocar Lambda / firmar S3 desde Vercel.
- * Preferencia: keys estáticas WORKER_AWS_* (QA) → OIDC assume-role → default chain.
+ * Preferencia: OIDC (WORKER_AWS_ROLE_ARN) → keys estáticas → default chain.
+ * Las keys estáticas no deben quedar en Production si el usuario IAM ya no existe.
  */
+export function workerAwsAuthMode(): WorkerAwsAuthMode {
+  if (firstEnv("WORKER_AWS_ROLE_ARN", "AWS_ROLE_ARN", "AWS_S3_ROLE_ARN")) return "oidc";
+  if (firstEnv("WORKER_AWS_ACCESS_KEY_ID") && firstEnv("WORKER_AWS_SECRET_ACCESS_KEY")) {
+    return "static";
+  }
+  return "default";
+}
+
 export function workerAwsCredentials(): AwsCredentialsProvider | undefined {
+  const roleArn = firstEnv("WORKER_AWS_ROLE_ARN", "AWS_ROLE_ARN", "AWS_S3_ROLE_ARN");
+  if (roleArn) {
+    // Vercel docs: aud sts.amazonaws.com para STS AssumeRoleWithWebIdentity.
+    return awsCredentialsProvider({
+      roleArn,
+      audience: "sts.amazonaws.com",
+      clientConfig: { region: firstEnv("WORKER_AWS_REGION", "AWS_REGION") || "us-east-1" },
+    });
+  }
+
   const accessKeyId = firstEnv("WORKER_AWS_ACCESS_KEY_ID");
   const secretAccessKey = firstEnv("WORKER_AWS_SECRET_ACCESS_KEY");
   if (accessKeyId && secretAccessKey) {
@@ -23,25 +44,21 @@ export function workerAwsCredentials(): AwsCredentialsProvider | undefined {
     });
   }
 
-  const roleArn = firstEnv("WORKER_AWS_ROLE_ARN", "AWS_ROLE_ARN", "AWS_S3_ROLE_ARN");
-  if (!roleArn) return undefined;
-
-  // Audience por defecto de Vercel (https://vercel.com/<team>).
-  // Evitar aud custom hasta que el IdP/trust estén 100% alineados.
-  return awsCredentialsProvider({ roleArn });
+  return undefined;
 }
 
 export async function oidcClaimHint(): Promise<string> {
+  const mode = workerAwsAuthMode();
   try {
     const token = await getVercelOidcToken();
     const payload = decodeJwtPayload(token);
-    if (!payload) return "";
+    if (!payload) return ` (auth=${mode})`;
     const iss = payload.iss ?? "?";
     const aud = payload.aud ?? "?";
     const sub = payload.sub ?? "?";
-    return ` (oidc iss=${iss} aud=${aud} sub=${sub})`;
+    return ` (auth=${mode}; oidc iss=${iss} aud=${aud} sub=${sub})`;
   } catch {
-    return " (oidc token no disponible)";
+    return ` (auth=${mode}; oidc token no disponible)`;
   }
 }
 
