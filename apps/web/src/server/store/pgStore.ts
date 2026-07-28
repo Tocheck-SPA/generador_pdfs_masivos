@@ -132,10 +132,7 @@ export class PgStore implements JobStore {
       }
 
       for (const ref of input.responseRefs) {
-        const responseDate =
-          ref.completedAt instanceof Date
-            ? ref.completedAt.toISOString()
-            : new Date(ref.completedAt).toISOString();
+        const responseDate = new Date(ref.completedAt).toISOString();
         await client.query(
           `INSERT INTO report_job_items
             (job_id, source_response_id, source_response_date, source_evaluation_point_id)
