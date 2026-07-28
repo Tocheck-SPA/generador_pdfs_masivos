@@ -106,8 +106,10 @@ export async function POST(request: Request) {
       await dispatchWorkerJob({ jobId: result.jobId, request });
     } catch (dispatchError) {
       console.error("No se pudo despertar el worker", dispatchError);
+      const detail =
+        dispatchError instanceof Error ? dispatchError.message : String(dispatchError);
       return jsonError(
-        `Trabajo creado (${result.jobId}), pero no se pudo iniciar el procesador`,
+        `Trabajo creado (${result.jobId}), pero no se pudo iniciar el procesador: ${detail}`,
         502,
       );
     }
