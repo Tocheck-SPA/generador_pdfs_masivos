@@ -30,6 +30,79 @@ function periodLabel(job: JobSummary): string {
   return `${job.dateFrom} → ${toStr}`;
 }
 
+function formatDateParts(iso: string): { date: string; time: string } {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { date: iso, time: "" };
+  return {
+    date: d.toLocaleDateString("es-CL", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }),
+    time: d.toLocaleTimeString("es-CL", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+  };
+}
+
+function periodParts(job: JobSummary): { from: string; to: string } {
+  const [from, to] = periodLabel(job).split(" → ");
+  return { from: `${from} →`, to };
+}
+
+function CalendarIcon() {
+  return (
+    <svg className="table-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="4" y="5" width="16" height="15" rx="2" />
+      <path d="M8 3v4M16 3v4M4 9h16" />
+    </svg>
+  );
+}
+
+function FileIcon() {
+  return (
+    <svg className="table-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6 3h8l4 4v14H6z" />
+      <path d="M14 3v5h4" />
+    </svg>
+  );
+}
+
+function UsersIcon() {
+  return (
+    <svg className="table-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3.5 20a5.5 5.5 0 0 1 11 0M16 5.5a3 3 0 0 1 0 5.8M16 13a5.5 5.5 0 0 1 4.5 4.5" />
+    </svg>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg className="button-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 3v11M8 10l4 4 4-4M5 20h14" />
+    </svg>
+  );
+}
+
+function LinkIcon() {
+  return (
+    <svg className="button-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m9.5 14.5 5-5M7 17H5a3 3 0 0 1 0-6h3M17 7h2a3 3 0 0 1 0 6h-3" />
+    </svg>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg className="button-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 12s3-5 9-5 9 5 9 5-3 5-9 5-9-5-9-5Z" />
+      <circle cx="12" cy="12" r="2" />
+    </svg>
+  );
+}
+
 export default function HistoryTable({
   highlightJobId,
 }: {
@@ -110,7 +183,7 @@ export default function HistoryTable({
       <table className="table">
         <thead>
           <tr>
-            <th>Fecha</th>
+            <th>Fecha y hora</th>
             <th>Empresa</th>
             <th>Formulario</th>
             <th>Periodo</th>
@@ -124,17 +197,40 @@ export default function HistoryTable({
           {jobs.map((job) => {
             const active = isActiveStatus(job.status);
             const isOpen = expanded.has(job.id);
+            const createdAt = formatDateParts(job.createdAt);
+            const period = periodParts(job);
             return (
               <Fragment key={job.id}>
                 <tr
                   className={job.id === highlightJobId ? "highlight-row" : undefined}
                 >
-                  <td>{formatDate(job.createdAt)}</td>
+                  <td>
+                    <div className="table-cell-with-icon">
+                      <CalendarIcon />
+                      <span className="table-cell-stack">
+                        <span>{createdAt.date}</span>
+                        <span>{createdAt.time}</span>
+                      </span>
+                    </div>
+                  </td>
                   <td>{job.companyName ?? job.companyId}</td>
                   <td>{job.formName ?? job.formId}</td>
-                  <td>{periodLabel(job)}</td>
-                  <td>{job.totalResponses}</td>
                   <td>
+                    <div className="table-cell-with-icon">
+                      <CalendarIcon />
+                      <span className="table-cell-stack">
+                        <span>{period.from}</span>
+                        <span>{period.to}</span>
+                      </span>
+                    </div>
+                  </td>
+                  <td>
+                    <div className="table-cell-with-icon">
+                      <FileIcon />
+                      <span>{job.totalResponses}</span>
+                    </div>
+                  </td>
+                  <td className="status-cell">
                     <StatusBadge status={job.status} />
                     {active && (
                       <div style={{ marginTop: 8 }}>
@@ -146,11 +242,16 @@ export default function HistoryTable({
                     )}
                   </td>
                   <td className="recipients-cell">
-                    {job.recipients.map((r) => (
-                      <span className="recipient-pill" key={r}>
-                        {r}
-                      </span>
-                    ))}
+                    <div className="recipient-list">
+                      <UsersIcon />
+                      <div className="recipient-values">
+                        {job.recipients.map((r) => (
+                          <span className="recipient-pill" key={r}>
+                            {r}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   </td>
                   <td>
                     <div className="row-actions">
@@ -161,6 +262,7 @@ export default function HistoryTable({
                           target="_blank"
                           rel="noreferrer"
                         >
+                          <DownloadIcon />
                           Descargar
                         </a>
                       )}
@@ -170,6 +272,7 @@ export default function HistoryTable({
                           className="btn btn-secondary btn-sm"
                           onClick={() => copyLink(job.id)}
                         >
+                          <LinkIcon />
                           {copied === job.id ? "Copiado" : "Copiar enlace"}
                         </button>
                       )}
@@ -196,6 +299,7 @@ export default function HistoryTable({
                         className="btn btn-secondary btn-sm"
                         onClick={() => toggleExpand(job.id)}
                       >
+                        <EyeIcon />
                         {isOpen ? "Ocultar" : "Ver detalle"}
                       </button>
                     </div>

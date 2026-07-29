@@ -247,21 +247,21 @@ select.form-control:disabled {
   color: var(--color-text-muted);
   font-weight: 500;
   font-size: 0.8em;
-  padding: 16px 6px;
+  padding: 14px 12px;
   letter-spacing: 0.5px;
   text-transform: uppercase;
   text-align: left;
   white-space: nowrap;
 }
 .table tbody td {
-  padding: 16px 10px;
+  padding: 14px 12px;
   color: #181c2a;
   border-bottom: 1px solid var(--color-border);
   vertical-align: middle;
   overflow-wrap: anywhere;
 }
 .table thead th:nth-child(1) {
-  width: 13%;
+  width: 15%;
 }
 .table thead th:nth-child(2) {
   width: 9%;
@@ -270,7 +270,7 @@ select.form-control:disabled {
   width: 13%;
 }
 .table thead th:nth-child(4) {
-  width: 15%;
+  width: 16%;
 }
 .table thead th:nth-child(5) {
   width: 8%;
@@ -279,10 +279,37 @@ select.form-control:disabled {
   width: 10%;
 }
 .table thead th:nth-child(7) {
-  width: 16%;
+  width: 15%;
 }
 .table thead th:nth-child(8) {
-  width: 16%;
+  width: 14%;
+}
+.table-cell-with-icon {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-width: 0;
+}
+.table-cell-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.table-icon {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  color: var(--color-primary);
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+.status-cell {
+  vertical-align: middle;
 }
 .table tbody tr:hover {
   background: var(--color-surface-alt);
@@ -462,7 +489,7 @@ select.form-control:disabled {
   font-size: 0.95em;
 }
 .app-main {
-  max-width: 1000px;
+  max-width: 1240px;
   margin: 0 auto;
   padding: 28px 24px 60px;
 }
@@ -541,24 +568,45 @@ select.form-control:disabled {
   flex-direction: column;
   flex-wrap: wrap;
   align-items: stretch;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
 }
 .row-actions .btn {
   width: 100%;
   justify-content: center;
+  gap: 6px;
   text-align: center;
-  white-space: normal;
+  white-space: nowrap;
+}
+.button-icon {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 .recipients-cell {
   max-width: none;
 }
+.recipient-list {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-width: 0;
+}
+.recipient-values {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
 .recipient-pill {
-  display: inline-block;
-  background: var(--color-surface-alt);
-  border-radius: 6px;
-  padding: 2px 8px;
-  margin: 2px;
+  display: block;
+  padding: 0;
+  margin: 0;
   font-size: 0.85em;
   color: var(--color-text);
   overflow-wrap: anywhere;
