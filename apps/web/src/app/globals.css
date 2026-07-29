@@ -247,11 +247,11 @@ select.form-control:disabled {
   color: var(--color-text-muted);
   font-weight: 500;
   font-size: 0.8em;
-  padding: 16px 18px;
+  padding: 16px 6px;
   letter-spacing: 0.5px;
   text-transform: uppercase;
   text-align: left;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 .table tbody td {
   padding: 16px 10px;
@@ -264,16 +264,16 @@ select.form-control:disabled {
   width: 13%;
 }
 .table thead th:nth-child(2) {
-  width: 8%;
+  width: 9%;
 }
 .table thead th:nth-child(3) {
-  width: 14%;
+  width: 13%;
 }
 .table thead th:nth-child(4) {
-  width: 16%;
+  width: 15%;
 }
 .table thead th:nth-child(5) {
-  width: 7%;
+  width: 8%;
 }
 .table thead th:nth-child(6) {
   width: 10%;
