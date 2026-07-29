@@ -237,8 +237,9 @@ select.form-control:disabled {
   background: #fff;
 }
 .table {
-  width: max-content;
-  min-width: 100%;
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
   border-collapse: collapse;
 }
 .table thead th {
@@ -250,12 +251,38 @@ select.form-control:disabled {
   letter-spacing: 0.5px;
   text-transform: uppercase;
   text-align: left;
+  overflow-wrap: anywhere;
 }
 .table tbody td {
-  padding: 16px 18px;
+  padding: 16px 10px;
   color: #181c2a;
   border-bottom: 1px solid var(--color-border);
   vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+.table thead th:nth-child(1) {
+  width: 13%;
+}
+.table thead th:nth-child(2) {
+  width: 8%;
+}
+.table thead th:nth-child(3) {
+  width: 14%;
+}
+.table thead th:nth-child(4) {
+  width: 16%;
+}
+.table thead th:nth-child(5) {
+  width: 7%;
+}
+.table thead th:nth-child(6) {
+  width: 10%;
+}
+.table thead th:nth-child(7) {
+  width: 16%;
+}
+.table thead th:nth-child(8) {
+  width: 16%;
 }
 .table tbody tr:hover {
   background: var(--color-surface-alt);
@@ -511,15 +538,20 @@ select.form-control:disabled {
 
 .row-actions {
   display: flex;
+  flex-direction: column;
   flex-wrap: wrap;
-  gap: 8px;
-  min-width: 168px;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
 }
 .row-actions .btn {
-  white-space: nowrap;
+  width: 100%;
+  justify-content: center;
+  text-align: center;
+  white-space: normal;
 }
 .recipients-cell {
-  max-width: 220px;
+  max-width: none;
 }
 .recipient-pill {
   display: inline-block;
@@ -529,6 +561,7 @@ select.form-control:disabled {
   margin: 2px;
   font-size: 0.85em;
   color: var(--color-text);
+  overflow-wrap: anywhere;
 }
 .detail-grid {
   display: grid;
