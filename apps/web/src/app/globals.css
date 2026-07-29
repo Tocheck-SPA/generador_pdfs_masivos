@@ -230,11 +230,15 @@ select.form-control:disabled {
   border-radius: 12px;
   box-shadow: var(--shadow-card);
   border: 1px solid rgba(0, 0, 0, 0.1);
+  max-width: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
   background: #fff;
 }
 .table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
 }
 .table thead th {
@@ -509,6 +513,10 @@ select.form-control:disabled {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 168px;
+}
+.row-actions .btn {
+  white-space: nowrap;
 }
 .recipients-cell {
   max-width: 220px;
